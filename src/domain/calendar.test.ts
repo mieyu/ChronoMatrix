@@ -1,10 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { format } from "date-fns";
 import {
+  getCalendarHeaderLabel,
   getCalendarDays,
   getCalendarEntriesForDay,
   getCalendarSpansForWeek,
+  getCalendarWeekDisplay,
   getUnscheduledPlans,
+  shiftCalendarAnchor,
 } from "./calendar";
 import type { Plan } from "./plan";
 
@@ -166,5 +169,62 @@ describe("getCalendarDays", () => {
     expect(format(days[0]!, "yyyy-MM-dd")).toBe("2026-06-01");
     expect(days.length % 7).toBe(0);
     expect(format(days.at(-1)!, "yyyy-MM-dd")).toBe("2026-07-05");
+  });
+});
+
+describe("shiftCalendarAnchor", () => {
+  test("moves week anchors by one week", () => {
+    const anchor = new Date("2026-06-05T10:00:00.000Z");
+
+    expect(format(shiftCalendarAnchor("week", anchor, "previous"), "yyyy-MM-dd")).toBe(
+      "2026-05-29",
+    );
+    expect(format(shiftCalendarAnchor("week", anchor, "next"), "yyyy-MM-dd")).toBe(
+      "2026-06-12",
+    );
+  });
+
+  test("moves month anchors by one month", () => {
+    const anchor = new Date("2026-06-05T10:00:00.000Z");
+
+    expect(format(shiftCalendarAnchor("month", anchor, "previous"), "yyyy-MM")).toBe(
+      "2026-05",
+    );
+    expect(format(shiftCalendarAnchor("month", anchor, "next"), "yyyy-MM")).toBe(
+      "2026-07",
+    );
+  });
+});
+
+describe("getCalendarHeaderLabel", () => {
+  test("labels month mode by anchor month", () => {
+    expect(
+      getCalendarHeaderLabel("month", new Date("2026-07-12T10:00:00.000Z")),
+    ).toBe("2026-07");
+  });
+
+  test("labels week mode by visible week range", () => {
+    expect(
+      getCalendarHeaderLabel("week", new Date("2026-06-05T10:00:00.000Z")),
+    ).toBe("2026-06-01 - 06-07");
+  });
+});
+
+describe("getCalendarWeekDisplay", () => {
+  test("keeps month view compact by hiding dense lanes", () => {
+    const display = getCalendarWeekDisplay("month", 5);
+
+    expect(display.visibleSpanCount).toBe(2);
+    expect(display.hiddenSpanCount).toBe(3);
+    expect(display.canScroll).toBe(false);
+  });
+
+  test("shows all span lanes in week mode and allows the row to grow", () => {
+    const display = getCalendarWeekDisplay("week", 8);
+
+    expect(display.visibleSpanCount).toBe(8);
+    expect(display.hiddenSpanCount).toBe(0);
+    expect(display.canScroll).toBe(true);
+    expect(display.minRowHeight).toBeGreaterThan(300);
   });
 });

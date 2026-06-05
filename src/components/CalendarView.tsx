@@ -1,14 +1,26 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { format, isSameMonth, isToday } from "date-fns";
-import { CalendarDays, Flag, Play, TimerOff } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Flag,
+  Play,
+  RotateCcw,
+  TimerOff,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getCalendarDays,
   getCalendarEntriesForDay,
+  getCalendarHeaderLabel,
   getCalendarSpansForWeek,
+  getCalendarWeekDisplay,
   getUnscheduledPlans,
+  shiftCalendarAnchor,
   type CalendarEntry,
   type CalendarMarkerKind,
   type CalendarMode,
@@ -33,9 +45,16 @@ const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export function CalendarView({ plans, now }: CalendarViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
   const [mode, setMode] = useState<CalendarMode>("week");
-  const days = getCalendarDays(mode, now);
+  const [calendarAnchor, setCalendarAnchor] = useState(now);
+  const days = getCalendarDays(mode, calendarAnchor);
   const weeks = chunkIntoWeeks(days);
   const unscheduledPlans = getUnscheduledPlans(plans);
+  const periodLabel = getCalendarHeaderLabel(mode, calendarAnchor);
+
+  function showWeek(weekStart: Date) {
+    setCalendarAnchor(weekStart);
+    setMode("week");
+  }
 
   return (
     <div className="grid min-h-0 grid-cols-[1fr_300px] gap-4">
@@ -48,7 +67,47 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">{format(now, "yyyy-MM")}</Badge>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon-sm"
+                variant="outline"
+                title={mode === "week" ? "上一周" : "上个月"}
+                onClick={() =>
+                  setCalendarAnchor((anchor) =>
+                    shiftCalendarAnchor(mode, anchor, "previous"),
+                  )
+                }
+              >
+                <ChevronLeft />
+              </Button>
+              <Badge
+                variant="secondary"
+                className="h-7 min-w-32 justify-center tabular-nums"
+              >
+                {periodLabel}
+              </Badge>
+              <Button
+                size="icon-sm"
+                variant="outline"
+                title={mode === "week" ? "下一周" : "下个月"}
+                onClick={() =>
+                  setCalendarAnchor((anchor) =>
+                    shiftCalendarAnchor(mode, anchor, "next"),
+                  )
+                }
+              >
+                <ChevronRight />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                title="回到今天"
+                onClick={() => setCalendarAnchor(now)}
+              >
+                <RotateCcw />
+                今天
+              </Button>
+            </div>
             <Tabs
               value={mode}
               onValueChange={(value) => setMode(value as CalendarMode)}
@@ -79,19 +138,28 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
           </div>
 
           <div
-            className="grid min-h-0"
-            style={{
-              gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))`,
-            }}
+            className={
+              mode === "week"
+                ? "min-h-0 overflow-y-auto overscroll-contain"
+                : "grid min-h-0 overflow-hidden"
+            }
+            style={
+              mode === "month"
+                ? {
+                    gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))`,
+                  }
+                : undefined
+            }
           >
             {weeks.map((week) => (
               <CalendarWeekRow
                 key={week[0]?.toISOString()}
                 week={week}
-                anchor={now}
+                anchor={calendarAnchor}
                 mode={mode}
                 plans={plans}
                 onOpenPlan={openEditDialog}
+                onShowWeek={showWeek}
               />
             ))}
           </div>
@@ -142,36 +210,39 @@ function CalendarWeekRow({
   mode,
   plans,
   onOpenPlan,
+  onShowWeek,
 }: {
   week: Date[];
   anchor: Date;
   mode: CalendarMode;
   plans: Plan[];
   onOpenPlan: (plan: Plan) => void;
+  onShowWeek: (weekStart: Date) => void;
 }) {
   const spans = getCalendarSpansForWeek(plans, week);
-  const visibleLaneCount =
-    mode === "month" ? Math.min(spans.length, 2) : Math.min(spans.length, 4);
-  const pointOffset =
-    mode === "month"
-      ? 38 + visibleLaneCount * 24
-      : 44 + visibleLaneCount * 30;
+  const display = getCalendarWeekDisplay(mode, spans.length);
+  const visibleSpans = spans.slice(0, display.visibleSpanCount);
 
   return (
-    <div className="relative grid min-h-0 grid-cols-7 overflow-hidden border-b last:border-b-0">
+    <div
+      className={`relative grid grid-cols-7 border-b last:border-b-0 ${
+        mode === "week" ? "overflow-visible" : "min-h-0 overflow-hidden"
+      }`}
+      style={mode === "week" ? { minHeight: display.minRowHeight } : undefined}
+    >
       {week.map((day) => (
         <CalendarDayCell
           key={day.toISOString()}
           day={day}
           anchor={anchor}
           mode={mode}
-          pointOffset={pointOffset}
+          pointOffset={display.pointOffset}
           entries={getCalendarEntriesForDay(plans, day)}
           onOpenPlan={onOpenPlan}
         />
       ))}
 
-      {spans.map((span, index) => (
+      {visibleSpans.map((span, index) => (
         <CalendarSpanBar
           key={`${span.plan.id}-${week[0]?.toISOString()}`}
           span={span}
@@ -180,6 +251,14 @@ function CalendarWeekRow({
           onClick={() => onOpenPlan(span.plan)}
         />
       ))}
+
+      {display.hiddenSpanCount > 0 && mode === "month" ? (
+        <CalendarHiddenSpansButton
+          count={display.hiddenSpanCount}
+          lane={display.visibleSpanCount}
+          onClick={() => onShowWeek(week[0] ?? anchor)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -205,7 +284,7 @@ function CalendarDayCell({
     <section
       className={`min-h-0 min-w-0 border-r p-2 last:border-r-0 ${
         outsideMonth ? "bg-muted/20 text-muted-foreground" : "bg-background"
-      }`}
+      } ${mode === "week" ? "overflow-visible" : "overflow-hidden"}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span
@@ -223,7 +302,9 @@ function CalendarDayCell({
       </div>
 
       <div
-        className="grid content-start gap-1 overflow-hidden"
+        className={`grid content-start gap-1 ${
+          mode === "week" ? "overflow-visible" : "overflow-hidden"
+        }`}
         style={{ paddingTop: pointOffset }}
       >
         {entries.map((entry) => (
@@ -236,6 +317,34 @@ function CalendarDayCell({
         ))}
       </div>
     </section>
+  );
+}
+
+function CalendarHiddenSpansButton({
+  count,
+  lane,
+  onClick,
+}: {
+  count: number;
+  lane: number;
+  onClick: () => void;
+}) {
+  const style: CSSProperties = {
+    left: "6px",
+    right: "6px",
+    top: 42 + lane * 24,
+  };
+
+  return (
+    <button
+      type="button"
+      className="absolute z-10 flex h-6 items-center justify-center rounded-md border border-dashed bg-muted/80 px-2 text-xs font-medium text-muted-foreground transition hover:border-ring hover:bg-muted hover:text-foreground"
+      style={style}
+      onClick={onClick}
+      title="切到这一周查看全部任务条"
+    >
+      +{count} 更多，切到周视图
+    </button>
   );
 }
 

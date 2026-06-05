@@ -1,8 +1,11 @@
 import {
   addDays,
+  addMonths,
+  addWeeks,
   differenceInCalendarDays,
   endOfMonth,
   endOfWeek,
+  format,
   isSameDay,
   startOfDay,
   startOfMonth,
@@ -11,6 +14,7 @@ import {
 import type { Plan } from "./plan";
 
 export type CalendarMode = "week" | "month";
+export type CalendarNavigationDirection = "previous" | "next";
 export type CalendarMarkerKind = "start" | "end";
 
 export interface CalendarMarker {
@@ -33,6 +37,14 @@ export interface CalendarSpan {
   isEndVisible: boolean;
 }
 
+export interface CalendarWeekDisplay {
+  visibleSpanCount: number;
+  hiddenSpanCount: number;
+  pointOffset: number;
+  minRowHeight: number;
+  canScroll: boolean;
+}
+
 export function getCalendarDays(mode: CalendarMode, anchor: Date): Date[] {
   const start =
     mode === "week"
@@ -49,6 +61,57 @@ export function getCalendarDays(mode: CalendarMode, anchor: Date): Date[] {
   }
 
   return days;
+}
+
+export function shiftCalendarAnchor(
+  mode: CalendarMode,
+  anchor: Date,
+  direction: CalendarNavigationDirection,
+): Date {
+  const amount = direction === "previous" ? -1 : 1;
+
+  return mode === "week" ? addWeeks(anchor, amount) : addMonths(anchor, amount);
+}
+
+export function getCalendarHeaderLabel(mode: CalendarMode, anchor: Date): string {
+  if (mode === "month") {
+    return format(anchor, "yyyy-MM");
+  }
+
+  const days = getCalendarDays("week", anchor);
+  const start = days[0] ?? anchor;
+  const end = days[6] ?? anchor;
+
+  return `${format(start, "yyyy-MM-dd")} - ${format(end, "MM-dd")}`;
+}
+
+export function getCalendarWeekDisplay(
+  mode: CalendarMode,
+  spanCount: number,
+): CalendarWeekDisplay {
+  if (mode === "month") {
+    const visibleSpanCount = Math.min(spanCount, 2);
+    const hiddenSpanCount = Math.max(spanCount - visibleSpanCount, 0);
+    const summaryLaneCount = hiddenSpanCount > 0 ? 1 : 0;
+
+    return {
+      visibleSpanCount,
+      hiddenSpanCount,
+      pointOffset: 38 + (visibleSpanCount + summaryLaneCount) * 24,
+      minRowHeight: 0,
+      canScroll: false,
+    };
+  }
+
+  const visibleSpanCount = spanCount;
+
+  return {
+    visibleSpanCount,
+    hiddenSpanCount: 0,
+    pointOffset: 44 + visibleSpanCount * 30,
+    minRowHeight: Math.max(520, 120 + visibleSpanCount * 30),
+    canScroll: true,
+  };
 }
 
 export function getCalendarEntriesForDay(
