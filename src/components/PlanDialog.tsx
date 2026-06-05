@@ -29,6 +29,12 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { createPlan, deletePlan, type PlanDraft, updatePlan } from "@/data/plans";
+import {
+  buildDateShortcutOptions,
+  endDateShortcuts,
+  startDateShortcuts,
+  type DateShortcutOption,
+} from "@/domain/dateShortcuts";
 import type { Plan, StoredPlanStatus } from "@/domain/plan";
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
@@ -55,6 +61,15 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
   const [endAt, setEndAt] = useState("");
   const [storedStatus, setStoredStatus] =
     useState<StoredPlanStatus>("not_started");
+  const shortcutReference = new Date();
+  const startShortcutOptions = buildDateShortcutOptions(
+    startDateShortcuts,
+    shortcutReference,
+  );
+  const endShortcutOptions = buildDateShortcutOptions(
+    endDateShortcuts,
+    shortcutReference,
+  );
 
   useEffect(() => {
     setTitle(plan?.title ?? "");
@@ -162,6 +177,7 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
               emptyLabel="未设置开始时间"
               icon={<CalendarClock className="size-4" />}
               value={startAt}
+              shortcuts={startShortcutOptions}
               onChange={setStartAt}
             />
             <OptionalDateTimeField
@@ -170,6 +186,7 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
               emptyLabel="未设置结束时间"
               icon={<Clock3 className="size-4" />}
               value={endAt}
+              shortcuts={endShortcutOptions}
               onChange={setEndAt}
             />
           </div>
@@ -232,6 +249,7 @@ function OptionalDateTimeField({
   emptyLabel,
   icon,
   value,
+  shortcuts = [],
   onChange,
 }: {
   id: string;
@@ -239,6 +257,7 @@ function OptionalDateTimeField({
   emptyLabel: string;
   icon: ReactNode;
   value: string;
+  shortcuts?: DateShortcutOption[];
   onChange: (value: string) => void;
 }) {
   return (
@@ -265,6 +284,21 @@ function OptionalDateTimeField({
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
+      {shortcuts.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {shortcuts.map((shortcut) => (
+            <Button
+              key={shortcut.id}
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => onChange(shortcut.value)}
+            >
+              {shortcut.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
       <p className="text-xs text-muted-foreground">
         {value ? "已设置时间；点击清空可设为无时间" : emptyLabel}
       </p>
