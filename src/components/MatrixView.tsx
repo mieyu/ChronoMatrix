@@ -1,6 +1,24 @@
-import { Children, useState, type FocusEvent, type ReactNode } from "react";
+import {
+  Children,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type PointerEvent,
+  type ReactNode,
+  type WheelEvent,
+} from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Clock3, Layers3, Pencil } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Layers3,
+  Pencil,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +30,15 @@ import {
   type MatrixClusterLayoutItem,
   type MatrixPlanLayoutItem,
 } from "@/domain/matrixLayout";
+import {
+  defaultMatrixViewport,
+  getMatrixLayoutRulesForScale,
+  panMatrixViewport,
+  resetMatrixViewport,
+  zoomMatrixViewportAt,
+  zoomMatrixViewportByWheel,
+  type MatrixViewport,
+} from "@/domain/matrixViewport";
 import { getPlanMatrixPlacement, type Plan } from "@/domain/plan";
 import { formatPlanTime, formatTimePressure } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
@@ -24,6 +51,15 @@ interface MatrixViewProps {
 export function MatrixView({ plans, now }: MatrixViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
   const queryClient = useQueryClient();
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    lastX: number;
+    lastY: number;
+  } | null>(null);
+  const [viewport, setViewport] =
+    useState<MatrixViewport>(defaultMatrixViewport);
+  const [isPanning, setIsPanning] = useState(false);
   const completeMutation = useMutation({
     mutationFn: completePlan,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plans"] }),
@@ -38,7 +74,100 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
   const unscheduledPlans = placements.filter(
     ({ placement }) => placement.bucket === "unscheduled",
   );
-  const matrixLayoutItems = buildMatrixLayoutItems(plans, now);
+  const matrixLayoutRules = useMemo(
+    () => getMatrixLayoutRulesForScale(viewport.scale),
+    [viewport.scale],
+  );
+  const matrixLayoutItems = useMemo(
+    () => buildMatrixLayoutItems(plans, now, undefined, matrixLayoutRules),
+    [matrixLayoutRules, now, plans],
+  );
+  const scaleLabel = `${Math.round(viewport.scale * 100)}%`;
+
+  function getCanvasPoint(event: WheelEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+  }
+
+  function getCanvasCenter() {
+    const rect = canvasRef.current?.getBoundingClientRect();
+
+    return {
+      x: (rect?.width ?? 0) / 2,
+      y: (rect?.height ?? 0) / 2,
+    };
+  }
+
+  function handleWheel(event: WheelEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest("[data-matrix-wheel-lock='true']")) {
+      return;
+    }
+
+    event.preventDefault();
+    const screenPoint = getCanvasPoint(event);
+    setViewport((current) =>
+      zoomMatrixViewportByWheel(current, screenPoint, event.deltaY),
+    );
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (
+      event.button !== 0 ||
+      (event.target as HTMLElement).closest("[data-matrix-interactive='true']")
+    ) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      lastX: event.clientX,
+      lastY: event.clientY,
+    };
+    setIsPanning(true);
+  }
+
+  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const delta = {
+      x: event.clientX - drag.lastX,
+      y: event.clientY - drag.lastY,
+    };
+    drag.lastX = event.clientX;
+    drag.lastY = event.clientY;
+    setViewport((current) => panMatrixViewport(current, delta));
+  }
+
+  function finishPointerDrag(event: PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    dragRef.current = null;
+    setIsPanning(false);
+  }
+
+  function zoomByStep(multiplier: number) {
+    const screenPoint = getCanvasCenter();
+    setViewport((current) =>
+      zoomMatrixViewportAt(current, screenPoint, current.scale * multiplier),
+    );
+  }
 
   return (
     <div className="grid min-h-0 grid-cols-[1fr_320px] gap-4">
@@ -53,33 +182,87 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
           <Badge variant="secondary">{matrixPlans.length} 个计划</Badge>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="relative h-[calc(100vh-210px)] min-h-[520px] overflow-hidden bg-background">
-            <div className="absolute inset-x-0 top-1/2 z-0 h-px bg-border" />
-            <div className="absolute inset-y-0 left-1/2 z-0 w-px bg-border" />
-            <div className="absolute left-1/2 top-1/2 z-0 size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-foreground/20 bg-muted/50" />
+          <div
+            ref={canvasRef}
+            className={`relative h-[calc(100vh-210px)] min-h-[520px] touch-none overflow-hidden overscroll-contain bg-background ${
+              isPanning ? "cursor-grabbing" : "cursor-grab"
+            }`}
+            onWheel={handleWheel}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={finishPointerDrag}
+            onPointerCancel={finishPointerDrag}
+          >
+            <div
+              data-matrix-interactive="true"
+              className="absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-background/95 p-1 shadow-sm backdrop-blur"
+            >
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                title="缩小矩阵画布"
+                onClick={() => zoomByStep(0.86)}
+              >
+                <ZoomOut />
+              </Button>
+              <Badge
+                variant="secondary"
+                className="h-7 min-w-14 justify-center tabular-nums"
+              >
+                {scaleLabel}
+              </Badge>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                title="放大矩阵画布"
+                onClick={() => zoomByStep(1.16)}
+              >
+                <ZoomIn />
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                title="重置矩阵视图"
+                onClick={() => setViewport(resetMatrixViewport())}
+              >
+                <RotateCcw />
+              </Button>
+            </div>
 
-            <QuadrantLabel className="left-4 top-4" title="重要 / 不紧急" />
-            <QuadrantLabel className="right-4 top-4" title="重要 / 紧急" />
-            <QuadrantLabel className="bottom-4 left-4" title="不重要 / 不紧急" />
-            <QuadrantLabel className="bottom-4 right-4" title="不重要 / 紧急" />
+            <div
+              className="absolute inset-0"
+              style={{
+                transform: `translate3d(${viewport.offsetX}px, ${viewport.offsetY}px, 0) scale(${viewport.scale})`,
+                transformOrigin: "0 0",
+              }}
+            >
+              <div className="absolute inset-x-0 top-1/2 z-0 h-px bg-border" />
+              <div className="absolute inset-y-0 left-1/2 z-0 w-px bg-border" />
+              <div className="absolute left-1/2 top-1/2 z-0 size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-foreground/20 bg-muted/50" />
 
-            {matrixLayoutItems.map((item) =>
-              item.kind === "plan" ? (
-                <MatrixPlanCard
-                  key={item.id}
-                  item={item}
-                  now={now}
-                  onClick={openEditDialog}
-                />
-              ) : (
-                <MatrixClusterCard
-                  key={item.id}
-                  item={item}
-                  now={now}
-                  onPlanClick={openEditDialog}
-                />
-              ),
-            )}
+              <QuadrantLabel className="left-4 top-4" title="重要 / 不紧急" />
+              <QuadrantLabel className="right-4 top-4" title="重要 / 紧急" />
+              <QuadrantLabel className="bottom-4 left-4" title="不重要 / 不紧急" />
+              <QuadrantLabel className="bottom-4 right-4" title="不重要 / 紧急" />
+
+              {matrixLayoutItems.map((item) =>
+                item.kind === "plan" ? (
+                  <MatrixPlanCard
+                    key={item.id}
+                    item={item}
+                    now={now}
+                    onClick={openEditDialog}
+                  />
+                ) : (
+                  <MatrixClusterCard
+                    key={item.id}
+                    item={item}
+                    now={now}
+                    onPlanClick={openEditDialog}
+                  />
+                ),
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -145,6 +328,7 @@ function MatrixPlanCard({
   return (
     <button
       type="button"
+      data-matrix-interactive="true"
       className="absolute z-10 w-44 -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-2 text-left shadow-sm transition hover:z-50 hover:border-ring hover:shadow-md focus-visible:z-50 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       style={matrixPosition(item.x, item.y)}
       onClick={() => onClick(plan)}
@@ -196,6 +380,7 @@ function MatrixClusterCard({
 
   return (
     <div
+      data-matrix-interactive="true"
       className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:z-50 focus-within:z-50"
       style={matrixPosition(item.x, item.y)}
       onMouseEnter={() => setExpanded(true)}
@@ -224,6 +409,7 @@ function MatrixClusterCard({
 
       {expanded ? (
         <div
+          data-matrix-wheel-lock="true"
           className={`absolute left-1/2 z-50 w-64 -translate-x-1/2 rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg ${panelVerticalClass}`}
         >
           <div className="grid max-h-64 gap-1 overflow-auto">
