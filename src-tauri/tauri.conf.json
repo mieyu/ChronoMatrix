@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "ChronoMatrix",
-        "width": 1200,
-        "height": 760,
-        "minWidth": 960,
-        "minHeight": 640
+        "width": 1500,
+        "height": 960,
+        "minWidth": 1180,
+        "minHeight": 760
       }
     ],
     "security": {

@@ -17,6 +17,7 @@ import { ListView } from "@/components/ListView";
 import { MatrixView } from "@/components/MatrixView";
 import { PlanDialog } from "@/components/PlanDialog";
 import { listPlans } from "@/data/plans";
+import { appShellMinSizeClass } from "@/domain/appLayout";
 import {
   deriveEffectiveStatus,
   type EffectivePlanStatus,
@@ -57,7 +58,9 @@ function App() {
   const stats = useMemo(() => getStats(plans, now), [plans, now]);
 
   return (
-    <main className="flex h-screen min-h-[640px] min-w-[960px] flex-col bg-[#f7f7f4] text-foreground">
+    <main
+      className={`flex h-screen ${appShellMinSizeClass} flex-col bg-[#f7f7f4] text-foreground`}
+    >
       <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-5">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
