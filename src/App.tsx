@@ -7,6 +7,7 @@ import {
   List,
   Plus,
   RefreshCcw,
+  SunMedium,
   TimerReset,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { CalendarView } from "@/components/CalendarView";
 import { ListView } from "@/components/ListView";
 import { MatrixView } from "@/components/MatrixView";
 import { PlanDialog } from "@/components/PlanDialog";
+import { TodayView } from "@/components/TodayView";
 import { listPlans } from "@/data/plans";
 import { appShellMinSizeClass } from "@/domain/appLayout";
 import {
@@ -26,6 +28,7 @@ import {
 import { useUiStore, type AppView } from "@/state/ui";
 
 const viewLabels: Record<AppView, string> = {
+  today: "今日",
   matrix: "矩阵",
   calendar: "日历",
   list: "列表",
@@ -82,6 +85,10 @@ function App() {
             onValueChange={(value) => setView(value as AppView)}
           >
             <TabsList>
+              <TabsTrigger value="today">
+                <SunMedium />
+                {viewLabels.today}
+              </TabsTrigger>
               <TabsTrigger value="matrix">
                 <Grid2X2 />
                 {viewLabels.matrix}
@@ -125,6 +132,7 @@ function App() {
           </div>
         ) : (
           <>
+            {view === "today" ? <TodayView plans={plans} now={now} /> : null}
             {view === "matrix" ? <MatrixView plans={plans} now={now} /> : null}
             {view === "calendar" ? (
               <CalendarView plans={plans} now={now} />

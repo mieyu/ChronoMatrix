@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Plan } from "@/domain/plan";
 
-export type AppView = "matrix" | "calendar" | "list";
+export type AppView = "today" | "matrix" | "calendar" | "list";
 
 interface UiState {
   view: AppView;
