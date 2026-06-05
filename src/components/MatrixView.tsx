@@ -1,12 +1,17 @@
-import { Children, type ReactNode } from "react";
+import { Children, useState, type FocusEvent, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Clock3, Pencil } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Layers3, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { completePlan } from "@/data/plans";
+import {
+  buildMatrixLayoutItems,
+  type MatrixClusterLayoutItem,
+  type MatrixPlanLayoutItem,
+} from "@/domain/matrixLayout";
 import { getPlanMatrixPlacement, type Plan } from "@/domain/plan";
 import { formatPlanTime, formatTimePressure } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
@@ -33,6 +38,7 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
   const unscheduledPlans = placements.filter(
     ({ placement }) => placement.bucket === "unscheduled",
   );
+  const matrixLayoutItems = buildMatrixLayoutItems(plans, now);
 
   return (
     <div className="grid min-h-0 grid-cols-[1fr_320px] gap-4">
@@ -57,37 +63,23 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
             <QuadrantLabel className="bottom-4 left-4" title="不重要 / 不紧急" />
             <QuadrantLabel className="bottom-4 right-4" title="不重要 / 紧急" />
 
-            {matrixPlans.map(({ plan, placement }) => {
-              if (placement.bucket !== "matrix") {
-                return null;
-              }
-
-              return (
-                <button
-                  key={plan.id}
-                  type="button"
-                  className="absolute z-10 w-44 -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-2 text-left shadow-sm transition hover:z-50 hover:border-ring hover:shadow-md focus-visible:z-50 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                  style={{
-                    left: `${50 + placement.x * 42}%`,
-                    top: `${50 - placement.y * 42}%`,
-                  }}
-                  onClick={() => openEditDialog(plan)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="line-clamp-2 text-sm font-medium leading-snug">
-                      {plan.title}
-                    </span>
-                    <Badge variant="outline" className="shrink-0">
-                      {plan.importanceScore}
-                    </Badge>
-                  </div>
-                  <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock3 className="size-3" />
-                    {formatTimePressure(plan.endAt ?? plan.startAt, now)}
-                  </div>
-                </button>
-              );
-            })}
+            {matrixLayoutItems.map((item) =>
+              item.kind === "plan" ? (
+                <MatrixPlanCard
+                  key={item.id}
+                  item={item}
+                  now={now}
+                  onClick={openEditDialog}
+                />
+              ) : (
+                <MatrixClusterCard
+                  key={item.id}
+                  item={item}
+                  now={now}
+                  onPlanClick={openEditDialog}
+                />
+              ),
+            )}
           </div>
         </CardContent>
       </Card>
@@ -137,6 +129,137 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
       </div>
     </div>
   );
+}
+
+function MatrixPlanCard({
+  item,
+  now,
+  onClick,
+}: {
+  item: MatrixPlanLayoutItem;
+  now: Date;
+  onClick: (plan: Plan) => void;
+}) {
+  const { plan } = item;
+
+  return (
+    <button
+      type="button"
+      className="absolute z-10 w-44 -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-2 text-left shadow-sm transition hover:z-50 hover:border-ring hover:shadow-md focus-visible:z-50 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      style={matrixPosition(item.x, item.y)}
+      onClick={() => onClick(plan)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="line-clamp-2 text-sm font-medium leading-snug">
+          {plan.title}
+        </span>
+        <Badge variant="outline" className="shrink-0">
+          {plan.importanceScore}
+        </Badge>
+      </div>
+      <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+        <Clock3 className="size-3" />
+        {formatTimePressure(plan.endAt ?? plan.startAt, now)}
+      </div>
+    </button>
+  );
+}
+
+function MatrixClusterCard({
+  item,
+  now,
+  onPlanClick,
+}: {
+  item: MatrixClusterLayoutItem;
+  now: Date;
+  onPlanClick: (plan: Plan) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const strongestPlan = item.plans.reduce((strongest, plan) =>
+    plan.importanceScore > strongest.importanceScore ? plan : strongest,
+  );
+  const previewTitle = item.plans
+    .slice(0, 2)
+    .map((plan) => plan.title)
+    .join(" / ");
+  const panelVerticalClass = item.quadrant.startsWith("important")
+    ? "top-[calc(100%+0.5rem)]"
+    : "bottom-[calc(100%+0.5rem)]";
+
+  function handleBlur(event: FocusEvent<HTMLDivElement>) {
+    const nextTarget = event.relatedTarget;
+
+    if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
+      setExpanded(false);
+    }
+  }
+
+  return (
+    <div
+      className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:z-50 focus-within:z-50"
+      style={matrixPosition(item.x, item.y)}
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+      onFocusCapture={() => setExpanded(true)}
+      onBlurCapture={handleBlur}
+    >
+      <button
+        type="button"
+        className="w-48 rounded-lg border border-dashed bg-card p-2 text-left shadow-sm transition hover:border-ring hover:shadow-md focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-sm font-medium">
+            <Layers3 className="size-4" />
+            {item.plans.length} 个计划
+          </span>
+          <Badge variant="outline" className="shrink-0">
+            {strongestPlan.importanceScore}
+          </Badge>
+        </div>
+        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+          {previewTitle}
+        </p>
+      </button>
+
+      {expanded ? (
+        <div
+          className={`absolute left-1/2 z-50 w-64 -translate-x-1/2 rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg ${panelVerticalClass}`}
+        >
+          <div className="grid max-h-64 gap-1 overflow-auto">
+            {item.plans.map((plan) => (
+              <button
+                key={plan.id}
+                type="button"
+                className="rounded-md p-2 text-left transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                onClick={() => onPlanClick(plan)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="line-clamp-2 text-sm font-medium">
+                    {plan.title}
+                  </span>
+                  <Badge variant="outline" className="shrink-0">
+                    {plan.importanceScore}
+                  </Badge>
+                </div>
+                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock3 className="size-3" />
+                  {formatTimePressure(plan.endAt ?? plan.startAt, now)}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function matrixPosition(x: number, y: number) {
+  return {
+    left: `${50 + x * 42}%`,
+    top: `${50 - y * 42}%`,
+  };
 }
 
 function QuadrantLabel({
