@@ -3,6 +3,9 @@ import { buildMatrixLayoutItems } from "./matrixLayout";
 import {
   defaultMatrixViewport,
   getMatrixLayoutRulesForScale,
+  getMatrixViewportCssLength,
+  getMatrixViewportCssPoint,
+  getMatrixViewportCssPx,
   panMatrixViewport,
   resetMatrixViewport,
   zoomMatrixViewportAt,
@@ -140,5 +143,25 @@ describe("matrixViewport", () => {
     expect(planItems(zoomedOutItems)).toHaveLength(0);
     expect(clusterItems(zoomedInItems)).toHaveLength(0);
     expect(planItems(zoomedInItems)).toHaveLength(3);
+  });
+
+  test("projects canvas coordinates without a scaling transform", () => {
+    const style = getMatrixViewportCssPoint(
+      { scale: 2, offsetX: -20, offsetY: 10 },
+      { xPercent: 71, yPercent: 60.5 },
+    );
+
+    expect(style).toEqual({
+      left: "calc(-20px + 142%)",
+      top: "calc(10px + 121%)",
+    });
+    expect("transform" in style).toBe(false);
+  });
+
+  test("scales canvas lengths by recalculating CSS sizes", () => {
+    const viewport: MatrixViewport = { scale: 1.5, offsetX: 0, offsetY: 0 };
+
+    expect(getMatrixViewportCssLength(viewport, 100)).toBe("150%");
+    expect(getMatrixViewportCssPx(viewport, 112)).toBe("168px");
   });
 });

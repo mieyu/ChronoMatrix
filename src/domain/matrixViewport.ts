@@ -14,6 +14,16 @@ export interface MatrixViewportPoint {
   y: number;
 }
 
+export interface MatrixViewportCssPoint {
+  xPercent: number;
+  yPercent: number;
+}
+
+export interface MatrixViewportCssPosition {
+  left: string;
+  top: string;
+}
+
 export interface MatrixViewportLimits {
   minScale: number;
   maxScale: number;
@@ -75,6 +85,34 @@ export function resetMatrixViewport(): MatrixViewport {
   return defaultMatrixViewport;
 }
 
+export function getMatrixViewportCssPoint(
+  viewport: MatrixViewport,
+  point: MatrixViewportCssPoint,
+): MatrixViewportCssPosition {
+  return {
+    left: `calc(${formatCssNumber(viewport.offsetX)}px + ${formatCssNumber(
+      point.xPercent * viewport.scale,
+    )}%)`,
+    top: `calc(${formatCssNumber(viewport.offsetY)}px + ${formatCssNumber(
+      point.yPercent * viewport.scale,
+    )}%)`,
+  };
+}
+
+export function getMatrixViewportCssLength(
+  viewport: MatrixViewport,
+  percent: number,
+): string {
+  return `${formatCssNumber(percent * viewport.scale)}%`;
+}
+
+export function getMatrixViewportCssPx(
+  viewport: MatrixViewport,
+  px: number,
+): string {
+  return `${formatCssNumber(px * viewport.scale)}px`;
+}
+
 export function getMatrixLayoutRulesForScale(
   scale: number,
   baseRules: MatrixLayoutRules = defaultMatrixLayoutRules,
@@ -115,4 +153,10 @@ function getClusterMinSize(scale: number, baseMinSize: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function formatCssNumber(value: number): string {
+  const rounded = Math.round(value * 10_000) / 10_000;
+
+  return `${Object.is(rounded, -0) ? 0 : rounded}`;
 }
