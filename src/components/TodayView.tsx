@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
+  Clock3,
+  NotebookPen,
   Pencil,
   Sparkles,
 } from "lucide-react";
@@ -18,11 +20,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { DailyTimeSlicePanel } from "@/components/DailyTimeSlicePanel";
 import {
   getDailyNotebookEntry,
   listDailyNotebookEntries,
   saveDailyNotebookEntry,
 } from "@/data/dailyNotebook";
+import { listDailyTimeSliceDates } from "@/data/dailyTimeSlices";
 import { completePlan } from "@/data/plans";
 import {
   getDailyNotebookDateKey,
@@ -43,6 +47,8 @@ interface TodayViewProps {
   now: Date;
 }
 
+type DailyMode = "notebook" | "time_slices";
+
 const sectionIcons: Record<TodaySectionId, ReactNode> = {
   expired: <AlertTriangle className="size-4 text-rose-500" />,
   due_today: <CalendarClock className="size-4" />,
@@ -56,6 +62,7 @@ export function TodayView({ plans, now }: TodayViewProps) {
   const todayDate = useMemo(() => getDailyNotebookDateKey(now), [now]);
   const [selectedDate, setSelectedDate] = useState(todayDate);
   const [notebookBody, setNotebookBody] = useState("");
+  const [dailyMode, setDailyMode] = useState<DailyMode>("notebook");
   const completeMutation = useMutation({
     mutationFn: completePlan,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plans"] }),
@@ -63,6 +70,10 @@ export function TodayView({ plans, now }: TodayViewProps) {
   const historyQuery = useQuery({
     queryKey: ["daily-notebooks"],
     queryFn: listDailyNotebookEntries,
+  });
+  const timeSliceDatesQuery = useQuery({
+    queryKey: ["daily-time-slice-dates"],
+    queryFn: listDailyTimeSliceDates,
   });
   const notebookQuery = useQuery({
     queryKey: ["daily-notebook", selectedDate],
@@ -78,6 +89,17 @@ export function TodayView({ plans, now }: TodayViewProps) {
   });
   const sections = useMemo(() => buildTodaySections(plans, now), [plans, now]);
   const total = getTodayPlanCount(sections);
+  const historyDates = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          todayDate,
+          ...(historyQuery.data ?? []).map((entry) => entry.date),
+          ...(timeSliceDatesQuery.data ?? []),
+        ]),
+      ).sort((a, b) => b.localeCompare(a)),
+    [historyQuery.data, timeSliceDatesQuery.data, todayDate],
+  );
   const flushNotebook = useCallback(() => {
     if (!notebookQuery.data || notebookBody === notebookQuery.data.body) {
       return;
@@ -120,17 +142,20 @@ export function TodayView({ plans, now }: TodayViewProps) {
   }, [notebookBody, notebookQuery.data, saveNotebookMutation, selectedDate]);
 
   return (
-    <div className="grid min-h-0 grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)] gap-4">
-      <DailyNotebookPanel
+    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)] gap-4">
+      <DailyWorkspacePanel
         body={notebookBody}
+        dailyMode={dailyMode}
         entry={notebookQuery.data}
-        history={historyQuery.data ?? []}
-        isHistoryLoading={historyQuery.isLoading}
+        historyDates={historyDates}
+        isHistoryLoading={historyQuery.isLoading || timeSliceDatesQuery.isLoading}
         isSaving={saveNotebookMutation.isPending}
+        now={now}
         selectedDate={selectedDate}
         todayDate={todayDate}
         onBodyChange={setNotebookBody}
         onBodyBlur={flushNotebook}
+        onModeChange={setDailyMode}
         onSelectDate={selectNotebookDate}
       />
 
@@ -145,44 +170,35 @@ export function TodayView({ plans, now }: TodayViewProps) {
   );
 }
 
-function DailyNotebookPanel({
+function DailyWorkspacePanel({
   body,
+  dailyMode,
   entry,
-  history,
+  historyDates,
   isHistoryLoading,
   isSaving,
+  now,
   selectedDate,
   todayDate,
   onBodyChange,
   onBodyBlur,
+  onModeChange,
   onSelectDate,
 }: {
   body: string;
+  dailyMode: DailyMode;
   entry?: DailyNotebookEntry;
-  history: DailyNotebookEntry[];
+  historyDates: string[];
   isHistoryLoading: boolean;
   isSaving: boolean;
+  now: Date;
   selectedDate: string;
   todayDate: string;
   onBodyChange: (body: string) => void;
   onBodyBlur: () => void;
+  onModeChange: (mode: DailyMode) => void;
   onSelectDate: (date: string) => void;
 }) {
-  const historyWithToday = useMemo(() => {
-    if (history.some((item) => item.date === todayDate)) {
-      return history;
-    }
-
-    return [
-      {
-        date: todayDate,
-        body: "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      ...history,
-    ];
-  }, [history, todayDate]);
   const saveLabel = isSaving
     ? "保存中"
     : entry && body === entry.body
@@ -190,20 +206,34 @@ function DailyNotebookPanel({
       : "待保存";
 
   return (
-    <Card className="min-h-0 overflow-hidden">
+    <Card className="h-full min-h-0 overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between border-b py-4">
         <div>
-          <CardTitle>每日记录本</CardTitle>
+          <CardTitle>每日记录</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             {selectedDate === todayDate ? "今天" : selectedDate}
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className="border-slate-200 bg-slate-50 text-slate-600"
-        >
-          {saveLabel}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-lg border bg-muted/30 p-0.5">
+            <Button
+              variant={dailyMode === "notebook" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => onModeChange("notebook")}
+            >
+              <NotebookPen />
+              记录本
+            </Button>
+            <Button
+              variant={dailyMode === "time_slices" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => onModeChange("time_slices")}
+            >
+              <Clock3 />
+              时间切片
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="grid min-h-0 flex-1 grid-cols-[190px_1fr] gap-0 p-0">
         <aside className="min-h-0 border-r bg-muted/20">
@@ -215,26 +245,26 @@ function DailyNotebookPanel({
               <p className="px-2 py-6 text-center text-xs text-muted-foreground">
                 读取中
               </p>
-            ) : historyWithToday.length === 0 ? (
+            ) : historyDates.length === 0 ? (
               <p className="px-2 py-6 text-center text-xs text-muted-foreground">
                 暂无历史记录
               </p>
             ) : (
               <div className="grid gap-1">
-                {historyWithToday.map((item) => (
+                {historyDates.map((date) => (
                   <button
-                    key={item.date}
+                    key={date}
                     type="button"
                     className={`rounded-md px-2 py-2 text-left text-xs transition hover:bg-background ${
-                      item.date === selectedDate
+                      date === selectedDate
                         ? "bg-background text-foreground ring-1 ring-foreground/10"
                         : "text-muted-foreground"
                     }`}
-                    onClick={() => onSelectDate(item.date)}
+                    onClick={() => onSelectDate(date)}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{item.date}</span>
-                      {item.date === todayDate ? (
+                      <span className="font-medium">{date}</span>
+                      {date === todayDate ? (
                         <Badge
                           variant="outline"
                           className="border-sky-100 bg-sky-50 px-1.5 py-0 text-[10px] text-sky-700"
@@ -243,24 +273,32 @@ function DailyNotebookPanel({
                         </Badge>
                       ) : null}
                     </div>
-                    <p className="mt-1 line-clamp-1">
-                      {item.body.trim().split("\n")[0] || "空白记录"}
-                    </p>
                   </button>
                 ))}
               </div>
             )}
           </div>
         </aside>
-        <div className="min-h-0 p-3">
-          <Textarea
-            value={body}
-            onChange={(event) => onBodyChange(event.target.value)}
-            onBlur={onBodyBlur}
-            placeholder="今天的零碎事项、想法、临时安排..."
-            className="h-full min-h-[calc(100vh-250px)] resize-none border-0 bg-transparent p-2 text-sm leading-6 shadow-none focus-visible:ring-0"
+        {dailyMode === "notebook" ? (
+          <div className="relative min-h-0 p-3">
+            <span className="absolute right-4 top-3 text-xs text-muted-foreground">
+              {saveLabel}
+            </span>
+            <Textarea
+              value={body}
+              onChange={(event) => onBodyChange(event.target.value)}
+              onBlur={onBodyBlur}
+              placeholder="今天的零碎事项、想法、临时安排..."
+              className="h-full min-h-[calc(100vh-250px)] resize-none border-0 bg-transparent p-2 pt-7 text-sm leading-6 shadow-none focus-visible:ring-0"
+            />
+          </div>
+        ) : (
+          <DailyTimeSlicePanel
+            now={now}
+            selectedDate={selectedDate}
+            todayDate={todayDate}
           />
-        </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -280,7 +318,7 @@ function TodayAttentionPanel({
   onEdit: (plan: Plan) => void;
 }) {
   return (
-    <Card className="min-h-0 overflow-hidden">
+    <Card className="h-full min-h-0 overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between border-b py-4">
         <div>
           <CardTitle>今日计划提醒</CardTitle>

@@ -135,6 +135,25 @@ fn migrations() -> Vec<Migration> {
         "#,
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "create_daily_time_slices",
+            sql: r#"
+            CREATE TABLE IF NOT EXISTS daily_time_slices (
+                id TEXT PRIMARY KEY,
+                date TEXT NOT NULL CHECK (date GLOB '????-??-??'),
+                title TEXT NOT NULL DEFAULT '',
+                start_minute INTEGER NOT NULL CHECK (start_minute >= 0 AND start_minute < 1440),
+                end_minute INTEGER NOT NULL CHECK (end_minute > start_minute AND end_minute <= 1440),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_daily_time_slices_date
+                ON daily_time_slices(date, start_minute, end_minute);
+        "#,
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
