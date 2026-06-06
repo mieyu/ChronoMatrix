@@ -22,7 +22,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     id: "plan-1",
     title: "Draft launch plan",
     description: "",
-    importanceScore: 70,
+    importanceScore: 7,
     startAt: null,
     endAt: "2026-06-05T11:00:00.000Z",
     storedStatus: "not_started",

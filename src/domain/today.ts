@@ -1,4 +1,5 @@
 import { isSameDay } from "date-fns";
+import { importantScoreThreshold } from "./importance";
 import { deriveEffectiveStatus, type Plan } from "./plan";
 
 export type TodaySectionId =
@@ -14,8 +15,6 @@ export interface TodaySection {
   emptyLabel: string;
   plans: Plan[];
 }
-
-const importantThreshold = 60;
 
 const sectionMeta: Omit<TodaySection, "plans">[] = [
   {
@@ -101,7 +100,7 @@ function getTodaySectionId(plan: Plan, now: Date): TodaySectionId | null {
     return "starts_today";
   }
 
-  if (!plan.startAt && !plan.endAt && plan.importanceScore >= importantThreshold) {
+  if (!plan.startAt && !plan.endAt && plan.importanceScore >= importantScoreThreshold) {
     return "important_unscheduled";
   }
 

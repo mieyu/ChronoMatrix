@@ -26,6 +26,7 @@ import {
   type CalendarMode,
   type CalendarSpan,
 } from "@/domain/calendar";
+import { importantScoreThreshold } from "@/domain/importance";
 import type { Plan } from "@/domain/plan";
 import { formatPlanTime } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
@@ -189,7 +190,7 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="line-clamp-2 font-medium">{plan.title}</span>
-                    <Badge variant="outline">{plan.importanceScore}</Badge>
+                    <Badge variant="outline">{plan.importanceScore}/10</Badge>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     没有开始时间和结束时间
@@ -361,7 +362,7 @@ function CalendarSpanBar({
 }) {
   const top = mode === "month" ? 42 + lane * 24 : 46 + lane * 30;
   const colorClass =
-    span.plan.importanceScore >= 60
+    span.plan.importanceScore >= importantScoreThreshold
       ? "border-emerald-300 bg-emerald-50 text-emerald-950 hover:bg-emerald-100"
       : "border-sky-200 bg-sky-50 text-sky-950 hover:bg-sky-100";
   const style: CSSProperties = {
@@ -409,7 +410,7 @@ function CalendarPointCard({
         <span className="truncate font-medium">{entry.plan.title}</span>
         {!compact ? (
           <Badge variant="outline" className="ml-auto shrink-0">
-            {entry.plan.importanceScore}
+            {entry.plan.importanceScore}/10
           </Badge>
         ) : null}
       </div>

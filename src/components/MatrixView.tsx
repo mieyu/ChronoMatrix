@@ -304,7 +304,7 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
       <div className="grid min-h-0 grid-rows-[1fr_1fr] gap-4">
         <SidePanel
           title="已过期计划"
-          icon={<AlertTriangle className="size-4 text-destructive" />}
+          icon={<AlertTriangle className="size-4 text-rose-500" />}
           empty="暂无过期计划"
         >
           {expiredPlans.map(({ plan }) => (
@@ -374,7 +374,7 @@ function MatrixPlanCard({
           {plan.title}
         </span>
         <Badge variant="outline" className="shrink-0">
-          {plan.importanceScore}
+          {plan.importanceScore}/10
         </Badge>
       </div>
       <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -437,7 +437,7 @@ function MatrixClusterCard({
             {item.plans.length} 个计划
           </span>
           <Badge variant="outline" className="shrink-0">
-            {strongestPlan.importanceScore}
+            {strongestPlan.importanceScore}/10
           </Badge>
         </div>
         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -463,7 +463,7 @@ function MatrixClusterCard({
                     {plan.title}
                   </span>
                   <Badge variant="outline" className="shrink-0">
-                    {plan.importanceScore}
+                    {plan.importanceScore}/10
                   </Badge>
                 </div>
                 <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
@@ -608,7 +608,7 @@ function PlanListItem({
       </div>
       {danger ? <Separator className="my-2" /> : null}
       {danger ? (
-        <p className="text-xs text-destructive">
+        <p className="text-xs text-rose-600">
           {formatTimePressure(plan.endAt, new Date())}
         </p>
       ) : null}

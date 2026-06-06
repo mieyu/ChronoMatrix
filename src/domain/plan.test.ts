@@ -12,7 +12,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     id: "plan-1",
     title: "Draft launch plan",
     description: "",
-    importanceScore: 70,
+    importanceScore: 7,
     startAt: null,
     endAt: null,
     storedStatus: "not_started",
@@ -95,11 +95,11 @@ describe("getPlanMatrixPlacement", () => {
   test("maps important urgent plans to the important urgent quadrant", () => {
     const placement = getPlanMatrixPlacement(
       plan({
-        importanceScore: 90,
+        importanceScore: 9,
         endAt: "2026-06-05T11:00:00.000Z",
       }),
       now,
-      { urgentWindowHours: 72, pressureHorizonDays: 14, importantThreshold: 60 },
+      { urgentWindowHours: 72, pressureHorizonDays: 14, importantThreshold: 6 },
     );
 
     expect(placement.bucket).toBe("matrix");

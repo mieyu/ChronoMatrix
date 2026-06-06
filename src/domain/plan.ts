@@ -1,4 +1,5 @@
 import { differenceInMilliseconds } from "date-fns";
+import { importantScoreThreshold } from "./importance";
 
 export type StoredPlanStatus =
   | "not_started"
@@ -53,7 +54,7 @@ export type PlanMatrixPlacement =
 export const defaultMatrixRules: MatrixRules = {
   urgentWindowHours: 72,
   pressureHorizonDays: 14,
-  importantThreshold: 60,
+  importantThreshold: importantScoreThreshold,
 };
 
 export function deriveEffectiveStatus(

@@ -1,4 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
+import { normalizeImportanceScore } from "@/domain/importance";
 import type { Plan, StoredPlanStatus } from "@/domain/plan";
 
 const DATABASE_URL = "sqlite:chronomatrix.db";
@@ -53,7 +54,7 @@ export async function createPlan(draft: PlanDraft): Promise<Plan> {
     id: crypto.randomUUID(),
     title: draft.title.trim(),
     description: draft.description.trim(),
-    importanceScore: draft.importanceScore,
+    importanceScore: normalizeImportanceScore(draft.importanceScore),
     startAt: draft.startAt,
     endAt: draft.endAt,
     storedStatus: draft.storedStatus,
@@ -108,6 +109,7 @@ export async function updatePlan(id: string, draft: PlanDraft): Promise<void> {
               ...draft,
               title: draft.title.trim(),
               description: draft.description.trim(),
+              importanceScore: normalizeImportanceScore(draft.importanceScore),
               updatedAt: now,
               completedAt,
               archivedAt,
@@ -135,7 +137,7 @@ export async function updatePlan(id: string, draft: PlanDraft): Promise<void> {
     [
       draft.title.trim(),
       draft.description.trim(),
-      draft.importanceScore,
+      normalizeImportanceScore(draft.importanceScore),
       draft.startAt,
       draft.endAt,
       draft.storedStatus,
@@ -205,7 +207,7 @@ function fromRow(row: PlanRow): Plan {
     id: row.id,
     title: row.title,
     description: row.description,
-    importanceScore: row.importance_score,
+    importanceScore: normalizeImportanceScore(row.importance_score),
     startAt: row.start_at,
     endAt: row.end_at,
     storedStatus: row.stored_status,
@@ -224,9 +226,18 @@ function readLocalPlans(): Plan[] {
     return [];
   }
 
-  return JSON.parse(raw) as Plan[];
+  const plans = (JSON.parse(raw) as Plan[]).map(normalizePlan);
+  writeLocalPlans(plans);
+  return plans;
 }
 
 function writeLocalPlans(plans: Plan[]): void {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(plans));
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(plans.map(normalizePlan)));
+}
+
+function normalizePlan(plan: Plan): Plan {
+  return {
+    ...plan,
+    importanceScore: normalizeImportanceScore(plan.importanceScore),
+  };
 }

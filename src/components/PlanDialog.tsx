@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatusBadge, planStatusLabels } from "@/components/StatusBadge";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,12 @@ import {
   startDateShortcuts,
   type DateShortcutOption,
 } from "@/domain/dateShortcuts";
+import {
+  defaultImportanceScore,
+  maxImportanceScore,
+  minImportanceScore,
+  normalizeImportanceScore,
+} from "@/domain/importance";
 import type { Plan, StoredPlanStatus } from "@/domain/plan";
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
@@ -44,19 +51,19 @@ interface PlanDialogProps {
   open: boolean;
 }
 
-const statusLabels: Record<StoredPlanStatus, string> = {
-  not_started: "未开始",
-  in_progress: "进行中",
-  completed: "已完成",
-  archived: "已归档",
-};
+const storedStatusOptions: StoredPlanStatus[] = [
+  "not_started",
+  "in_progress",
+  "completed",
+  "archived",
+];
 
 export function PlanDialog({ plan, open }: PlanDialogProps) {
   const queryClient = useQueryClient();
   const closeDialog = useUiStore((state) => state.closeDialog);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [importanceScore, setImportanceScore] = useState(65);
+  const [importanceScore, setImportanceScore] = useState(defaultImportanceScore);
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [storedStatus, setStoredStatus] =
@@ -74,7 +81,9 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
   useEffect(() => {
     setTitle(plan?.title ?? "");
     setDescription(plan?.description ?? "");
-    setImportanceScore(plan?.importanceScore ?? 65);
+    setImportanceScore(
+      normalizeImportanceScore(plan?.importanceScore ?? defaultImportanceScore),
+    );
     setStartAt(toDateTimeLocalValue(plan?.startAt ?? null));
     setEndAt(toDateTimeLocalValue(plan?.endAt ?? null));
     setStoredStatus(plan?.storedStatus ?? "not_started");
@@ -158,15 +167,17 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
             <div className="flex items-center justify-between">
               <Label>重要程度</Label>
               <span className="text-sm font-medium tabular-nums">
-                {importanceScore}
+                {importanceScore}/10
               </span>
             </div>
             <Slider
-              min={0}
-              max={100}
-              step={5}
+              min={minImportanceScore}
+              max={maxImportanceScore}
+              step={1}
               value={[importanceScore]}
-              onValueChange={(value) => setImportanceScore(value[0] ?? 0)}
+              onValueChange={(value) =>
+                setImportanceScore(normalizeImportanceScore(value[0] ?? 0))
+              }
             />
           </div>
 
@@ -192,7 +203,10 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label>当前状态</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>当前状态</Label>
+              <StatusBadge status={storedStatus} />
+            </div>
             <Select
               value={storedStatus}
               onValueChange={(value) =>
@@ -203,9 +217,9 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(statusLabels).map(([value, label]) => (
+                {storedStatusOptions.map((value) => (
                   <SelectItem key={value} value={value}>
-                    {label}
+                    {planStatusLabels[value]}
                   </SelectItem>
                 ))}
               </SelectContent>

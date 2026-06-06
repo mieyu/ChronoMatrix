@@ -13,7 +13,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     id: "plan-1",
     title: "Draft launch plan",
     description: "",
-    importanceScore: 70,
+    importanceScore: 7,
     startAt: null,
     endAt: "2026-06-05T11:00:00.000Z",
     storedStatus: "not_started",
@@ -117,10 +117,10 @@ describe("buildMatrixLayoutItems", () => {
   test("does not cluster nearby plans across quadrant boundaries", () => {
     const items = buildMatrixLayoutItems(
       [
-        plan({ id: "important-a", title: "Important A", importanceScore: 80 }),
-        plan({ id: "important-b", title: "Important B", importanceScore: 82 }),
-        plan({ id: "minor-a", title: "Minor A", importanceScore: 20 }),
-        plan({ id: "minor-b", title: "Minor B", importanceScore: 22 }),
+        plan({ id: "important-a", title: "Important A", importanceScore: 8 }),
+        plan({ id: "important-b", title: "Important B", importanceScore: 8 }),
+        plan({ id: "minor-a", title: "Minor A", importanceScore: 2 }),
+        plan({ id: "minor-b", title: "Minor B", importanceScore: 2 }),
       ],
       now,
     );

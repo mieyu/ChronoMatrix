@@ -28,7 +28,7 @@ interface TodayViewProps {
 }
 
 const sectionIcons: Record<TodaySectionId, ReactNode> = {
-  expired: <AlertTriangle className="size-4 text-destructive" />,
+  expired: <AlertTriangle className="size-4 text-rose-500" />,
   due_today: <CalendarClock className="size-4" />,
   starts_today: <Sparkles className="size-4" />,
   important_unscheduled: <CalendarClock className="size-4" />,
@@ -95,7 +95,14 @@ function TodaySectionCard({
             {section.description}
           </p>
         </div>
-        <Badge variant={section.id === "expired" ? "destructive" : "secondary"}>
+        <Badge
+          variant="outline"
+          className={
+            section.id === "expired"
+              ? "border-rose-100 bg-rose-50 text-rose-700"
+              : "border-slate-200 bg-slate-50 text-slate-600"
+          }
+        >
           {section.plans.length}
         </Badge>
       </CardHeader>
@@ -143,7 +150,7 @@ function TodayPlanRow({
         <div className="flex items-center gap-2">
           <p className="truncate font-medium">{plan.title}</p>
           <Badge variant="outline" className="shrink-0">
-            {plan.importanceScore}
+            {plan.importanceScore}/10
           </Badge>
         </div>
         <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">

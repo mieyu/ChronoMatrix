@@ -4,8 +4,9 @@ import { CheckCircle2, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/StatusBadge";
 import { completePlan } from "@/data/plans";
-import { deriveEffectiveStatus, type EffectivePlanStatus, type Plan } from "@/domain/plan";
+import { deriveEffectiveStatus, type Plan } from "@/domain/plan";
 import { formatPlanTime } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
 
@@ -13,14 +14,6 @@ interface ListViewProps {
   plans: Plan[];
   now: Date;
 }
-
-const statusLabels: Record<EffectivePlanStatus, string> = {
-  not_started: "未开始",
-  in_progress: "进行中",
-  completed: "已完成",
-  expired: "已过期",
-  archived: "已归档",
-};
 
 export function ListView({ plans, now }: ListViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
@@ -88,7 +81,7 @@ export function ListView({ plans, now }: ListViewProps) {
                       {plan.description || "无描述"}
                     </p>
                   </div>
-                  <span className="tabular-nums">{plan.importanceScore}</span>
+                  <span className="tabular-nums">{plan.importanceScore}/10</span>
                   <StatusBadge status={status} />
                   <span className="text-muted-foreground">
                     {formatPlanTime(plan.endAt)}
@@ -120,16 +113,6 @@ export function ListView({ plans, now }: ListViewProps) {
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function StatusBadge({ status }: { status: EffectivePlanStatus }) {
-  const variant = status === "expired" ? "destructive" : "secondary";
-
-  return (
-    <Badge variant={variant} className="w-fit">
-      {statusLabels[status]}
-    </Badge>
   );
 }
 

@@ -127,7 +127,7 @@ function App() {
             正在读取本地计划...
           </div>
         ) : plansQuery.isError ? (
-          <div className="grid h-full place-items-center text-sm text-destructive">
+          <div className="grid h-full place-items-center text-sm text-rose-600">
             读取计划失败：{String(plansQuery.error)}
           </div>
         ) : (
@@ -159,9 +159,16 @@ function Stat({
   icon?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
+    <div className="flex items-center justify-between rounded-lg border bg-card/80 px-3 py-2">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <Badge variant={tone === "danger" ? "destructive" : "secondary"}>
+      <Badge
+        variant="outline"
+        className={
+          tone === "danger"
+            ? "border-rose-100 bg-rose-50 text-rose-700"
+            : "border-slate-200 bg-slate-50 text-slate-600"
+        }
+      >
         {icon}
         {value}
       </Badge>

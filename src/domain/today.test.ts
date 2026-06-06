@@ -18,7 +18,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     id: "plan-1",
     title: "Draft launch plan",
     description: "",
-    importanceScore: 70,
+    importanceScore: 7,
     startAt: null,
     endAt: null,
     storedStatus: "not_started",
@@ -78,7 +78,7 @@ describe("buildTodaySections", () => {
   test("puts important unscheduled plans in the important unscheduled section", () => {
     const important = plan({
       id: "important",
-      importanceScore: 85,
+      importanceScore: 9,
     });
 
     expect(sectionIds([important]).important_unscheduled).toEqual(["important"]);
@@ -149,12 +149,12 @@ describe("buildTodaySections", () => {
       }),
       plan({
         id: "important-lower",
-        importanceScore: 70,
+        importanceScore: 7,
         updatedAt: "2026-06-05T10:00:00.000Z",
       }),
       plan({
         id: "important-higher",
-        importanceScore: 90,
+        importanceScore: 9,
         updatedAt: "2026-06-04T10:00:00.000Z",
       }),
     ]);
