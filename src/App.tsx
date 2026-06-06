@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
+  ChartNoAxesColumnIncreasing,
   CheckCircle2,
   Grid2X2,
   List,
@@ -17,6 +18,8 @@ import { CalendarView } from "@/components/CalendarView";
 import { ListView } from "@/components/ListView";
 import { MatrixView } from "@/components/MatrixView";
 import { PlanDialog } from "@/components/PlanDialog";
+import { ReminderRunner } from "@/components/ReminderRunner";
+import { ReviewView } from "@/components/ReviewView";
 import { TodayView } from "@/components/TodayView";
 import { listPlans } from "@/data/plans";
 import { appShellMinSizeClass } from "@/domain/appLayout";
@@ -32,6 +35,7 @@ const viewLabels: Record<AppView, string> = {
   matrix: "矩阵",
   calendar: "日历",
   list: "列表",
+  review: "复盘",
 };
 
 function App() {
@@ -101,6 +105,10 @@ function App() {
                 <List />
                 {viewLabels.list}
               </TabsTrigger>
+              <TabsTrigger value="review">
+                <ChartNoAxesColumnIncreasing />
+                {viewLabels.review}
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           <Button variant="outline" onClick={() => plansQuery.refetch()}>
@@ -139,11 +147,13 @@ function App() {
               <CalendarView plans={plans} now={now} />
             ) : null}
             {view === "list" ? <ListView plans={plans} now={now} /> : null}
+            {view === "review" ? <ReviewView plans={plans} now={now} /> : null}
           </>
         )}
       </section>
 
       <PlanDialog plan={editingPlan} open={dialogOpen} />
+      <ReminderRunner plans={plans} now={now} />
     </main>
   );
 }
