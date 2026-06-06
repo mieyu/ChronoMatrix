@@ -167,7 +167,7 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
             <div className="flex items-center justify-between">
               <Label>重要程度</Label>
               <span className="text-sm font-medium tabular-nums">
-                {importanceScore}/10
+                {importanceScore}
               </span>
             </div>
             <Slider

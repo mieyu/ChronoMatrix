@@ -119,6 +119,22 @@ fn migrations() -> Vec<Migration> {
         "#,
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "create_daily_notebooks",
+            sql: r#"
+            CREATE TABLE IF NOT EXISTS daily_notebooks (
+                date TEXT PRIMARY KEY CHECK (date GLOB '????-??-??'),
+                body TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_daily_notebooks_updated_at
+                ON daily_notebooks(updated_at);
+        "#,
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

@@ -190,7 +190,7 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="line-clamp-2 font-medium">{plan.title}</span>
-                    <Badge variant="outline">{plan.importanceScore}/10</Badge>
+                    <Badge variant="outline">{plan.importanceScore}</Badge>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     没有开始时间和结束时间
@@ -410,7 +410,7 @@ function CalendarPointCard({
         <span className="truncate font-medium">{entry.plan.title}</span>
         {!compact ? (
           <Badge variant="outline" className="ml-auto shrink-0">
-            {entry.plan.importanceScore}/10
+            {entry.plan.importanceScore}
           </Badge>
         ) : null}
       </div>

@@ -81,7 +81,7 @@ export function ListView({ plans, now }: ListViewProps) {
                       {plan.description || "无描述"}
                     </p>
                   </div>
-                  <span className="tabular-nums">{plan.importanceScore}/10</span>
+                  <span className="tabular-nums">{plan.importanceScore}</span>
                   <StatusBadge status={status} />
                   <span className="text-muted-foreground">
                     {formatPlanTime(plan.endAt)}

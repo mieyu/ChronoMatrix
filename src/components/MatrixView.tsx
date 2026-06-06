@@ -374,7 +374,7 @@ function MatrixPlanCard({
           {plan.title}
         </span>
         <Badge variant="outline" className="shrink-0">
-          {plan.importanceScore}/10
+          {plan.importanceScore}
         </Badge>
       </div>
       <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -437,7 +437,7 @@ function MatrixClusterCard({
             {item.plans.length} 个计划
           </span>
           <Badge variant="outline" className="shrink-0">
-            {strongestPlan.importanceScore}/10
+            {strongestPlan.importanceScore}
           </Badge>
         </div>
         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -463,7 +463,7 @@ function MatrixClusterCard({
                     {plan.title}
                   </span>
                   <Badge variant="outline" className="shrink-0">
-                    {plan.importanceScore}/10
+                    {plan.importanceScore}
                   </Badge>
                 </div>
                 <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
