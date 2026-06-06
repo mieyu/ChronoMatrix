@@ -180,6 +180,38 @@ export async function completePlan(id: string): Promise<void> {
   );
 }
 
+export async function restoreArchivedPlan(id: string): Promise<void> {
+  const now = new Date().toISOString();
+
+  if (!isTauriRuntime()) {
+    writeLocalPlans(
+      readLocalPlans().map((plan) =>
+        plan.id === id
+          ? {
+              ...plan,
+              storedStatus: "not_started",
+              completedAt: null,
+              archivedAt: null,
+              updatedAt: now,
+            }
+          : plan,
+      ),
+    );
+    return;
+  }
+
+  const db = await getDatabase();
+  await db.execute(
+    `UPDATE plans
+        SET stored_status = 'not_started',
+            completed_at = NULL,
+            archived_at = NULL,
+            updated_at = ?
+      WHERE id = ?`,
+    [now, id],
+  );
+}
+
 export async function deletePlan(id: string): Promise<void> {
   if (!isTauriRuntime()) {
     writeLocalPlans(readLocalPlans().filter((plan) => plan.id !== id));

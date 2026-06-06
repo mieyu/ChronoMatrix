@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Pencil } from "lucide-react";
+import { CheckCircle2, Pencil, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
-import { completePlan } from "@/data/plans";
+import { completePlan, restoreArchivedPlan } from "@/data/plans";
 import { deriveEffectiveStatus, type Plan } from "@/domain/plan";
 import { formatPlanTime } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
@@ -20,6 +20,10 @@ export function ListView({ plans, now }: ListViewProps) {
   const queryClient = useQueryClient();
   const completeMutation = useMutation({
     mutationFn: completePlan,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plans"] }),
+  });
+  const restoreMutation = useMutation({
+    mutationFn: restoreArchivedPlan,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plans"] }),
   });
 
@@ -95,6 +99,16 @@ export function ListView({ plans, now }: ListViewProps) {
                         onClick={() => completeMutation.mutate(plan.id)}
                       >
                         <CheckCircle2 />
+                      </Button>
+                    ) : null}
+                    {status === "archived" ? (
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        title="恢复归档"
+                        onClick={() => restoreMutation.mutate(plan.id)}
+                      >
+                        <RotateCcw />
                       </Button>
                     ) : null}
                     <Button

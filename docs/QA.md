@@ -20,7 +20,8 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u al
 - 可以同时设置开始和结束时间。
 - 可以清空开始时间和结束时间。
 - 可以编辑已有计划。
-- 可以删除计划。
+- 删除计划前出现确认弹窗。
+- 确认后可以删除计划。
 - 可以标记完成。
 
 ### 矩阵视图
@@ -46,6 +47,13 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u al
 - 已过期计划优先显示。
 - 编辑入口可用。
 - 标记完成后状态刷新。
+- 已归档计划可见。
+- 已归档计划可以恢复为未开始。
+
+### 每日视图
+
+- 时间切片删除前出现确认弹窗。
+- 确认后可以删除时间切片。
 
 ## 已知限制
 

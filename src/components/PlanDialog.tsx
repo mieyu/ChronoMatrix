@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StatusBadge, planStatusLabels } from "@/components/StatusBadge";
 import {
   Dialog,
@@ -68,6 +69,7 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
   const [endAt, setEndAt] = useState("");
   const [storedStatus, setStoredStatus] =
     useState<StoredPlanStatus>("not_started");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const shortcutReference = new Date();
   const startShortcutOptions = buildDateShortcutOptions(
     startDateShortcuts,
@@ -124,6 +126,7 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["plans"] });
+      setDeleteConfirmOpen(false);
       closeDialog();
     },
   });
@@ -131,129 +134,146 @@ export function PlanDialog({ plan, open }: PlanDialogProps) {
   const canSave = title.trim().length > 0 && !saveMutation.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && closeDialog()}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{plan ? "编辑计划" : "新增计划"}</DialogTitle>
-          <DialogDescription>
-            设置计划的重要度与时间边界，矩阵位置会随当前时间自动更新。
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => !nextOpen && closeDialog()}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{plan ? "编辑计划" : "新增计划"}</DialogTitle>
+            <DialogDescription>
+              设置计划的重要度与时间边界，矩阵位置会随当前时间自动更新。
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="plan-title">标题</Label>
-            <Input
-              id="plan-title"
-              autoFocus
-              value={title}
-              onChange={(event) => setTitle(event.currentTarget.value)}
-              placeholder="例如：整理本周观测计划"
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="plan-description">描述</Label>
-            <Textarea
-              id="plan-description"
-              value={description}
-              onChange={(event) => setDescription(event.currentTarget.value)}
-              placeholder="补充背景、输出物或注意事项"
-              rows={4}
-            />
-          </div>
-
-          <div className="grid gap-3">
-            <div className="flex items-center justify-between">
-              <Label>重要程度</Label>
-              <span className="text-sm font-medium tabular-nums">
-                {importanceScore}
-              </span>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="plan-title">标题</Label>
+              <Input
+                id="plan-title"
+                autoFocus
+                value={title}
+                onChange={(event) => setTitle(event.currentTarget.value)}
+                placeholder="例如：整理本周观测计划"
+              />
             </div>
-            <Slider
-              min={minImportanceScore}
-              max={maxImportanceScore}
-              step={1}
-              value={[importanceScore]}
-              onValueChange={(value) =>
-                setImportanceScore(normalizeImportanceScore(value[0] ?? 0))
-              }
-            />
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <OptionalDateTimeField
-              id="plan-start"
-              label="开始时间"
-              emptyLabel="未设置开始时间"
-              icon={<CalendarClock className="size-4" />}
-              value={startAt}
-              shortcuts={startShortcutOptions}
-              onChange={setStartAt}
-            />
-            <OptionalDateTimeField
-              id="plan-end"
-              label="结束时间"
-              emptyLabel="未设置结束时间"
-              icon={<Clock3 className="size-4" />}
-              value={endAt}
-              shortcuts={endShortcutOptions}
-              onChange={setEndAt}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label>当前状态</Label>
-              <StatusBadge status={storedStatus} />
+            <div className="grid gap-2">
+              <Label htmlFor="plan-description">描述</Label>
+              <Textarea
+                id="plan-description"
+                value={description}
+                onChange={(event) => setDescription(event.currentTarget.value)}
+                placeholder="补充背景、输出物或注意事项"
+                rows={4}
+              />
             </div>
-            <Select
-              value={storedStatus}
-              onValueChange={(value) =>
-                setStoredStatus(value as StoredPlanStatus)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {storedStatusOptions.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {planStatusLabels[value]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        <DialogFooter>
-          {plan ? (
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between">
+                <Label>重要程度</Label>
+                <span className="text-sm font-medium tabular-nums">
+                  {importanceScore}
+                </span>
+              </div>
+              <Slider
+                min={minImportanceScore}
+                max={maxImportanceScore}
+                step={1}
+                value={[importanceScore]}
+                onValueChange={(value) =>
+                  setImportanceScore(normalizeImportanceScore(value[0] ?? 0))
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <OptionalDateTimeField
+                id="plan-start"
+                label="开始时间"
+                emptyLabel="未设置开始时间"
+                icon={<CalendarClock className="size-4" />}
+                value={startAt}
+                shortcuts={startShortcutOptions}
+                onChange={setStartAt}
+              />
+              <OptionalDateTimeField
+                id="plan-end"
+                label="结束时间"
+                emptyLabel="未设置结束时间"
+                icon={<Clock3 className="size-4" />}
+                value={endAt}
+                shortcuts={endShortcutOptions}
+                onChange={setEndAt}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>当前状态</Label>
+                <StatusBadge status={storedStatus} />
+              </div>
+              <Select
+                value={storedStatus}
+                onValueChange={(value) =>
+                  setStoredStatus(value as StoredPlanStatus)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {storedStatusOptions.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {planStatusLabels[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            {plan ? (
+              <Button
+                type="button"
+                variant="destructive"
+                className="mr-auto"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 />
+                删除
+              </Button>
+            ) : null}
+            <Button type="button" variant="outline" onClick={closeDialog}>
+              取消
+            </Button>
             <Button
               type="button"
-              variant="destructive"
-              className="mr-auto"
-              onClick={() => deleteMutation.mutate()}
-              disabled={deleteMutation.isPending}
+              onClick={() => saveMutation.mutate()}
+              disabled={!canSave}
             >
-              <Trash2 />
-              删除
+              {storedStatus === "completed" ? <CheckCircle2 /> : <Save />}
+              保存
             </Button>
-          ) : null}
-          <Button type="button" variant="outline" onClick={closeDialog}>
-            取消
-          </Button>
-          <Button
-            type="button"
-            onClick={() => saveMutation.mutate()}
-            disabled={!canSave}
-          >
-            {storedStatus === "completed" ? <CheckCircle2 /> : <Save />}
-            保存
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {plan ? (
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          title="删除计划"
+          description={`确定删除“${plan.title}”？删除后不会出现在计划列表、矩阵和日历中。`}
+          confirmLabel="确认删除"
+          pending={deleteMutation.isPending}
+          onOpenChange={setDeleteConfirmOpen}
+          onConfirm={() => deleteMutation.mutate()}
+        />
+      ) : null}
+    </>
   );
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +48,8 @@ export function DailyTimeSlicePanel({
   const timelineRef = useRef<HTMLDivElement>(null);
   const [pendingMinute, setPendingMinute] = useState<number | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const [slicePendingDelete, setSlicePendingDelete] =
+    useState<DailyTimeSlice | null>(null);
   const slicesQuery = useQuery({
     queryKey: ["daily-time-slices", selectedDate],
     queryFn: () => listDailyTimeSlices(selectedDate),
@@ -85,6 +88,7 @@ export function DailyTimeSlicePanel({
   const deleteMutation = useMutation({
     mutationFn: deleteDailyTimeSlice,
     onSuccess: () => {
+      setSlicePendingDelete(null);
       queryClient.invalidateQueries({
         queryKey: ["daily-time-slices", selectedDate],
       });
@@ -130,125 +134,150 @@ export function DailyTimeSlicePanel({
   const overview = buildDailyTimeSliceOverview(slices);
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_auto_1fr] gap-3 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium">{title}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            点时间线一次选开始，再点一次选结束；时间自动记录。
-          </p>
+    <>
+      <div className="grid h-full min-h-0 grid-rows-[auto_auto_1fr] gap-3 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-medium">{title}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              点时间线一次选开始，再点一次选结束；时间自动记录。
+            </p>
+          </div>
+          {pendingMinute === null ? (
+            <span className="text-xs text-muted-foreground">未选择时间</span>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingMinute(null)}
+            >
+              清除 {formatMinuteOfDay(pendingMinute)}
+            </Button>
+          )}
         </div>
-        {pendingMinute === null ? (
-          <span className="text-xs text-muted-foreground">未选择时间</span>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPendingMinute(null)}
-          >
-            清除 {formatMinuteOfDay(pendingMinute)}
-          </Button>
-        )}
-      </div>
 
-      <DailyTimeSliceOverviewBar
-        activeSegmentId={activeSegmentId}
-        overview={overview}
-        onActiveSegmentChange={setActiveSegmentId}
-      />
+        <DailyTimeSliceOverviewBar
+          activeSegmentId={activeSegmentId}
+          overview={overview}
+          onActiveSegmentChange={setActiveSegmentId}
+        />
 
-      <div
-        ref={scrollAreaRef}
-        className="min-h-0 overflow-auto rounded-lg border bg-background"
-      >
         <div
-          ref={timelineRef}
-          className="relative cursor-crosshair"
-          style={{ height: timelineHeightPx }}
-          onClick={(event) => {
-            if (
-              event.target instanceof HTMLElement &&
-              event.target.closest("[data-time-slice-editor]")
-            ) {
-              return;
-            }
-
-            const rect = event.currentTarget.getBoundingClientRect();
-            const minute = getTimelineMinuteFromRatio(
-              (event.clientY - rect.top) / rect.height,
-            );
-
-            if (pendingMinute === null) {
-              setPendingMinute(minute);
-              return;
-            }
-
-            createMutation.mutate({
-              firstMinute: pendingMinute,
-              secondMinute: minute,
-            });
-            setPendingMinute(null);
-          }}
+          ref={scrollAreaRef}
+          className="min-h-0 overflow-auto rounded-lg border bg-background"
         >
-          {hourMarkers.map((hour) => (
-            <div
-              key={hour}
-              className="absolute left-0 right-0 border-t border-border/70"
-              style={{ top: `${(hour / 24) * 100}%` }}
-            >
-              <span className="absolute left-3 top-1 text-[11px] tabular-nums text-muted-foreground">
-                {formatMinuteOfDay(hour * 60)}
-              </span>
-            </div>
-          ))}
-
-          {selectedDate === todayDate ? (
-            <div
-              className="pointer-events-none absolute left-20 right-4 z-10 border-t-2 border-rose-200"
-              style={{ top: `${(currentMinute / dayMinuteCount) * 100}%` }}
-            >
-              <span className="absolute -left-16 -top-3 rounded bg-rose-50 px-1.5 py-0.5 text-[11px] tabular-nums text-rose-700 ring-1 ring-rose-100">
-                现在 {formatMinuteOfDay(currentMinute)}
-              </span>
-            </div>
-          ) : null}
-
-          {pendingMinute !== null ? (
-            <div
-              className="pointer-events-none absolute left-20 right-4 z-10 border-t-2 border-sky-300"
-              style={{ top: `${(pendingMinute / dayMinuteCount) * 100}%` }}
-            >
-              <span className="absolute -left-16 -top-3 rounded bg-sky-50 px-1.5 py-0.5 text-[11px] tabular-nums text-sky-700 ring-1 ring-sky-100">
-                {formatMinuteOfDay(pendingMinute)}
-              </span>
-            </div>
-          ) : null}
-
-          {slices.map((slice) => (
-            <TimeSliceBlock
-              key={slice.id}
-              slice={slice}
-              onDelete={() => deleteMutation.mutate(slice.id)}
-              onSelect={() => setActiveSegmentId(slice.id)}
-              onTitleSave={(title) =>
-                updateMutation.mutate({ id: slice.id, title })
+          <div
+            ref={timelineRef}
+            className="relative cursor-crosshair"
+            style={{ height: timelineHeightPx }}
+            onClick={(event) => {
+              if (
+                event.target instanceof HTMLElement &&
+                event.target.closest("[data-time-slice-editor]")
+              ) {
+                return;
               }
-            />
-          ))}
 
-          {slicesQuery.isLoading ? (
-            <p className="absolute inset-x-20 top-10 rounded-md bg-muted/80 px-3 py-2 text-center text-sm text-muted-foreground">
-              正在读取时间切片
-            </p>
-          ) : null}
-          {!slicesQuery.isLoading && slices.length === 0 && pendingMinute === null ? (
-            <p className="absolute inset-x-20 top-10 rounded-md border border-dashed bg-muted/40 px-3 py-8 text-center text-sm text-muted-foreground">
-              点击时间线开始规划今天的时间段
-            </p>
-          ) : null}
+              const rect = event.currentTarget.getBoundingClientRect();
+              const minute = getTimelineMinuteFromRatio(
+                (event.clientY - rect.top) / rect.height,
+              );
+
+              if (pendingMinute === null) {
+                setPendingMinute(minute);
+                return;
+              }
+
+              createMutation.mutate({
+                firstMinute: pendingMinute,
+                secondMinute: minute,
+              });
+              setPendingMinute(null);
+            }}
+          >
+            {hourMarkers.map((hour) => (
+              <div
+                key={hour}
+                className="absolute left-0 right-0 border-t border-border/70"
+                style={{ top: `${(hour / 24) * 100}%` }}
+              >
+                <span className="absolute left-3 top-1 text-[11px] tabular-nums text-muted-foreground">
+                  {formatMinuteOfDay(hour * 60)}
+                </span>
+              </div>
+            ))}
+
+            {selectedDate === todayDate ? (
+              <div
+                className="pointer-events-none absolute left-20 right-4 z-10 border-t-2 border-rose-200"
+                style={{ top: `${(currentMinute / dayMinuteCount) * 100}%` }}
+              >
+                <span className="absolute -left-16 -top-3 rounded bg-rose-50 px-1.5 py-0.5 text-[11px] tabular-nums text-rose-700 ring-1 ring-rose-100">
+                  现在 {formatMinuteOfDay(currentMinute)}
+                </span>
+              </div>
+            ) : null}
+
+            {pendingMinute !== null ? (
+              <div
+                className="pointer-events-none absolute left-20 right-4 z-10 border-t-2 border-sky-300"
+                style={{ top: `${(pendingMinute / dayMinuteCount) * 100}%` }}
+              >
+                <span className="absolute -left-16 -top-3 rounded bg-sky-50 px-1.5 py-0.5 text-[11px] tabular-nums text-sky-700 ring-1 ring-sky-100">
+                  {formatMinuteOfDay(pendingMinute)}
+                </span>
+              </div>
+            ) : null}
+
+            {slices.map((slice) => (
+              <TimeSliceBlock
+                key={slice.id}
+                slice={slice}
+                onDelete={() => setSlicePendingDelete(slice)}
+                onSelect={() => setActiveSegmentId(slice.id)}
+                onTitleSave={(title) =>
+                  updateMutation.mutate({ id: slice.id, title })
+                }
+              />
+            ))}
+
+            {slicesQuery.isLoading ? (
+              <p className="absolute inset-x-20 top-10 rounded-md bg-muted/80 px-3 py-2 text-center text-sm text-muted-foreground">
+                正在读取时间切片
+              </p>
+            ) : null}
+            {!slicesQuery.isLoading &&
+            slices.length === 0 &&
+            pendingMinute === null ? (
+              <p className="absolute inset-x-20 top-10 rounded-md border border-dashed bg-muted/40 px-3 py-8 text-center text-sm text-muted-foreground">
+                点击时间线开始规划今天的时间段
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
-    </div>
+      <ConfirmDialog
+        open={slicePendingDelete !== null}
+        title="删除时间段"
+        description={
+          slicePendingDelete
+            ? `确定删除 ${formatMinuteOfDay(slicePendingDelete.startMinute)}-${formatMinuteOfDay(slicePendingDelete.endMinute)} 这段记录？`
+            : ""
+        }
+        confirmLabel="确认删除"
+        pending={deleteMutation.isPending}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setSlicePendingDelete(null);
+          }
+        }}
+        onConfirm={() => {
+          if (slicePendingDelete) {
+            deleteMutation.mutate(slicePendingDelete.id);
+          }
+        }}
+      />
+    </>
   );
 }
 

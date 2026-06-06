@@ -114,11 +114,12 @@ function App() {
         </div>
       </header>
 
-      <section className="grid grid-cols-4 gap-3 border-b bg-background/80 px-5 py-3">
+      <section className="grid grid-cols-5 gap-3 border-b bg-background/80 px-5 py-3">
         <Stat label="全部" value={plans.length} />
         <Stat label="进行中" value={stats.in_progress} />
         <Stat label="已过期" value={stats.expired} tone="danger" />
         <Stat label="已完成" value={stats.completed} icon={<CheckCircle2 />} />
+        <Stat label="已归档" value={stats.archived} />
       </section>
 
       <section className="min-h-0 flex-1 p-4">
