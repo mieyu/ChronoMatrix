@@ -15,7 +15,7 @@
 ## 项目结构
 
 ```text
-docs/              产品、路线图、验收和发布说明
+docs/              产品、验收和发布说明
 src/               React 前端源码
 src/components/    视图和 UI 组件
 src/data/          SQLite 数据访问
@@ -28,7 +28,6 @@ src-tauri/         Tauri/Rust 桌面端配置和入口
 更多说明见：
 
 - [产品说明](docs/PRODUCT.md)
-- [路线图](docs/ROADMAP.md)
 - [验收清单](docs/QA.md)
 - [发布说明](docs/RELEASE.md)
 
