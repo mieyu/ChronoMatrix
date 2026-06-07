@@ -1,4 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use tauri::{
+    menu::{CheckMenuItem, Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, WindowEvent,
+};
+use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 const DATABASE_URL: &str = "sqlite:chronomatrix.db";
@@ -161,6 +167,10 @@ fn migrations() -> Vec<Migration> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--hidden"]),
+        ))
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations(DATABASE_URL, migrations())
@@ -168,6 +178,99 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet])
+        .setup(|app| {
+            let handle = app.handle();
+
+            // Tray menu: show window, toggle autostart, quit.
+            let show_item =
+                MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+            let autostart_enabled = handle.autolaunch().is_enabled().unwrap_or(false);
+            let autostart_item = CheckMenuItem::with_id(
+                app,
+                "autostart",
+                "开机自启（后台提醒）",
+                true,
+                autostart_enabled,
+                None::<&str>,
+            )?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_item, &autostart_item, &quit_item])?;
+
+            let autostart_item_for_events = autostart_item.clone();
+            TrayIconBuilder::with_id("main-tray")
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("时矩 ChronoMatrix")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "show" => show_main_window(app),
+                    "quit" => app.exit(0),
+                    "autostart" => {
+                        let manager = app.autolaunch();
+                        let enabled = manager.is_enabled().unwrap_or(false);
+                        let result = if enabled {
+                            manager.disable()
+                        } else {
+                            manager.enable()
+                        };
+
+                        if let Err(error) = result {
+                            eprintln!("Failed to toggle autostart: {error}");
+                        }
+
+                        let now_enabled = manager.is_enabled().unwrap_or(enabled);
+                        let _ = autostart_item_for_events.set_checked(now_enabled);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_main_window(tray.app_handle());
+                    }
+                })
+                .build(app)?;
+
+            // When launched at login via autostart, start hidden in the tray.
+            if std::env::args().any(|arg| arg == "--hidden") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+                #[cfg(target_os = "macos")]
+                let _ = handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            }
+
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Closing the window hides it to the tray instead of quitting, so
+            // the reminder loop keeps running in the background.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                // Drop the Dock icon so only the menu bar tray remains.
+                #[cfg(target_os = "macos")]
+                let _ = window
+                    .app_handle()
+                    .set_activation_policy(tauri::ActivationPolicy::Accessory);
+                api.prevent_close();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    // Restore the Dock icon when the window comes back.
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
 }

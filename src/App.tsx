@@ -8,6 +8,7 @@ import {
   List,
   Plus,
   RefreshCcw,
+  Search,
   SunMedium,
   TimerReset,
 } from "lucide-react";
@@ -20,6 +21,8 @@ import { MatrixView } from "@/components/MatrixView";
 import { PlanDialog } from "@/components/PlanDialog";
 import { ReminderRunner } from "@/components/ReminderRunner";
 import { ReviewView } from "@/components/ReviewView";
+import { SearchDialog } from "@/components/SearchDialog";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { TodayView } from "@/components/TodayView";
 import { listPlans } from "@/data/plans";
 import { appShellMinSizeClass } from "@/domain/appLayout";
@@ -29,6 +32,7 @@ import {
   type Plan,
 } from "@/domain/plan";
 import { useUiStore, type AppView } from "@/state/ui";
+import { initThemeEffect } from "@/state/theme";
 
 const viewLabels: Record<AppView, string> = {
   today: "今日",
@@ -42,6 +46,7 @@ function App() {
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
   const openCreateDialog = useUiStore((state) => state.openCreateDialog);
+  const openSearch = useUiStore((state) => state.openSearch);
   const dialogOpen = useUiStore((state) => state.dialogOpen);
   const editingPlan = useUiStore((state) => state.editingPlan);
   const [now, setNow] = useState(() => new Date());
@@ -49,6 +54,20 @@ function App() {
     queryKey: ["plans"],
     queryFn: listPlans,
   });
+
+  useEffect(() => initThemeEffect(), []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        openSearch();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openSearch]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 60_000);
@@ -66,7 +85,7 @@ function App() {
 
   return (
     <main
-      className={`flex h-screen ${appShellMinSizeClass} flex-col bg-[#f7f7f4] text-foreground`}
+      className={`flex h-screen ${appShellMinSizeClass} flex-col bg-background text-foreground`}
     >
       <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-5">
         <div className="flex items-center gap-3">
@@ -111,10 +130,18 @@ function App() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          <Button variant="outline" onClick={openSearch}>
+            <Search />
+            搜索
+            <kbd className="ml-1 rounded border bg-muted px-1 text-[10px] text-muted-foreground">
+              ⌘K
+            </kbd>
+          </Button>
           <Button variant="outline" onClick={() => plansQuery.refetch()}>
             <RefreshCcw />
             刷新
           </Button>
+          <ThemeToggle />
           <Button onClick={openCreateDialog}>
             <Plus />
             新增计划
@@ -153,6 +180,7 @@ function App() {
       </section>
 
       <PlanDialog plan={editingPlan} open={dialogOpen} />
+      <SearchDialog plans={plans} now={now} />
       <ReminderRunner plans={plans} now={now} />
     </main>
   );
