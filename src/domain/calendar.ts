@@ -90,14 +90,12 @@ export function getCalendarWeekDisplay(
   spanCount: number,
 ): CalendarWeekDisplay {
   if (mode === "month") {
-    const visibleSpanCount = Math.min(spanCount, 2);
-    const hiddenSpanCount = Math.max(spanCount - visibleSpanCount, 0);
-    const summaryLaneCount = hiddenSpanCount > 0 ? 1 : 0;
-
+    // Show every span and let the row grow downward instead of collapsing
+    // dense weeks behind a "+N more" affordance.
     return {
-      visibleSpanCount,
-      hiddenSpanCount,
-      pointOffset: 38 + (visibleSpanCount + summaryLaneCount) * 24,
+      visibleSpanCount: spanCount,
+      hiddenSpanCount: 0,
+      pointOffset: 38 + spanCount * 24,
       minRowHeight: 0,
       canScroll: false,
     };

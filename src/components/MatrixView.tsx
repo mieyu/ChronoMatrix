@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type FocusEvent,
   type PointerEvent,
   type ReactNode,
 } from "react";
@@ -51,6 +50,13 @@ interface MatrixViewProps {
   now: Date;
 }
 
+// One normalized matrix unit spans 42% of the canvas (see `matrixPosition`).
+const MATRIX_UNIT_FRACTION = 0.42;
+// Footprint (px) used to keep dots and their short labels from colliding.
+// Much smaller than a card, so dots stay close to their true position.
+const MATRIX_DOT_FOOTPRINT_WIDTH = 96;
+const MATRIX_DOT_FOOTPRINT_HEIGHT = 30;
+
 export function MatrixView({ plans, now }: MatrixViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
   const queryClient = useQueryClient();
@@ -63,6 +69,7 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
   const [viewport, setViewport] =
     useState<MatrixViewport>(defaultMatrixViewport);
   const [isPanning, setIsPanning] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const completeMutation = useMutation({
     mutationFn: completePlan,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plans"] }),
@@ -77,10 +84,27 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
   const unscheduledPlans = placements.filter(
     ({ placement }) => placement.bucket === "unscheduled",
   );
-  const matrixLayoutRules = useMemo(
-    () => getMatrixLayoutRulesForScale(viewport.scale),
-    [viewport.scale],
-  );
+  const matrixLayoutRules = useMemo(() => {
+    const baseRules = getMatrixLayoutRulesForScale(viewport.scale);
+    // The scatter view renders every plan as its own dot, so disable the
+    // folding clusters entirely.
+    const noClusterRules = {
+      ...baseRules,
+      clusterMinSize: Number.MAX_SAFE_INTEGER,
+    };
+    const spanX = MATRIX_UNIT_FRACTION * canvasSize.width * viewport.scale;
+    const spanY = MATRIX_UNIT_FRACTION * canvasSize.height * viewport.scale;
+
+    if (spanX <= 0 || spanY <= 0) {
+      return noClusterRules;
+    }
+
+    return {
+      ...noClusterRules,
+      cardHalfWidth: MATRIX_DOT_FOOTPRINT_WIDTH / 2 / spanX,
+      cardHalfHeight: MATRIX_DOT_FOOTPRINT_HEIGHT / 2 / spanY,
+    };
+  }, [canvasSize.height, canvasSize.width, viewport.scale]);
   const matrixLayoutItems = useMemo(
     () => buildMatrixLayoutItems(plans, now, undefined, matrixLayoutRules),
     [matrixLayoutRules, now, plans],
@@ -120,6 +144,26 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
     return () => {
       matrixCanvas.removeEventListener("wheel", handleWheel);
     };
+  }, []);
+
+  useEffect(() => {
+    const canvasElement = canvasRef.current;
+
+    if (!canvasElement) {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+
+      if (rect) {
+        setCanvasSize({ width: rect.width, height: rect.height });
+      }
+    });
+
+    observer.observe(canvasElement);
+
+    return () => observer.disconnect();
   }, []);
 
   function getCanvasCenter() {
@@ -189,12 +233,18 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
   return (
     <div className="grid min-h-0 grid-cols-[1fr_320px] gap-4">
       <Card className="min-h-0 overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between border-b">
+        <CardHeader className="flex flex-row items-start justify-between border-b">
           <div>
             <CardTitle>艾森豪威尔矩阵</CardTitle>
             <p className="text-sm text-muted-foreground">
-              越靠近中心，时间压力越高。
+              越靠近中心，时间压力越高；圆点越大越重要。
             </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+              <MatrixLegendItem className="bg-rose-500" label="重要·紧急" />
+              <MatrixLegendItem className="bg-amber-500" label="重要·不紧急" />
+              <MatrixLegendItem className="bg-sky-500" label="不重要·紧急" />
+              <MatrixLegendItem className="bg-slate-400" label="不重要·不紧急" />
+            </div>
           </div>
           <Badge variant="secondary">{matrixPlans.length} 个计划</Badge>
         </CardHeader>
@@ -248,38 +298,14 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
             <div className="absolute inset-0">
               <MatrixAxes viewport={viewport} />
 
-              <QuadrantLabel
-                title="重要 / 不紧急"
-                viewport={viewport}
-                xPercent={2}
-                yPercent={2}
-              />
-              <QuadrantLabel
-                anchorX="right"
-                title="重要 / 紧急"
-                viewport={viewport}
-                xPercent={98}
-                yPercent={2}
-              />
-              <QuadrantLabel
-                anchorY="bottom"
-                title="不重要 / 不紧急"
-                viewport={viewport}
-                xPercent={2}
-                yPercent={98}
-              />
-              <QuadrantLabel
-                anchorX="right"
-                anchorY="bottom"
-                title="不重要 / 紧急"
-                viewport={viewport}
-                xPercent={98}
-                yPercent={98}
-              />
+              <QuadrantLabel title="重要 / 不紧急" corner="tl" />
+              <QuadrantLabel title="重要 / 紧急" corner="tr" />
+              <QuadrantLabel title="不重要 / 不紧急" corner="bl" />
+              <QuadrantLabel title="不重要 / 紧急" corner="br" />
 
               {matrixLayoutItems.map((item) =>
                 item.kind === "plan" ? (
-                  <MatrixPlanCard
+                  <MatrixDot
                     key={item.id}
                     item={item}
                     now={now}
@@ -287,12 +313,11 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
                     onClick={openEditDialog}
                   />
                 ) : (
-                  <MatrixClusterCard
+                  <MatrixClusterDot
                     key={item.id}
                     item={item}
-                    now={now}
                     viewport={viewport}
-                    onPlanClick={openEditDialog}
+                    onClick={openEditDialog}
                   />
                 ),
               )}
@@ -348,7 +373,35 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
   );
 }
 
-function MatrixPlanCard({
+const quadrantDotClass: Record<MatrixPlanLayoutItem["quadrant"], string> = {
+  "important-urgent": "bg-rose-500",
+  "important-not-urgent": "bg-amber-500",
+  "not-important-urgent": "bg-sky-500",
+  "not-important-not-urgent": "bg-slate-400",
+};
+
+// Map importance (1–10) to a dot diameter in px.
+function dotDiameter(importanceScore: number): number {
+  const score = Math.min(Math.max(importanceScore, 1), 10);
+  return Math.round(12 + (score - 1) * 1.6);
+}
+
+function MatrixLegendItem({
+  className,
+  label,
+}: {
+  className: string;
+  label: string;
+}) {
+  return (
+    <span className="flex items-center gap-1">
+      <span className={`size-2.5 rounded-full ${className}`} />
+      {label}
+    </span>
+  );
+}
+
+function MatrixDot({
   item,
   now,
   viewport,
@@ -360,122 +413,95 @@ function MatrixPlanCard({
   onClick: (plan: Plan) => void;
 }) {
   const { plan } = item;
+  const size = dotDiameter(plan.importanceScore);
+  const position = matrixPosition(item.x, item.y, viewport);
+  // Right-hand (urgent) dots grow their label leftward so it never runs off
+  // the canvas edge; left-hand dots grow rightward. Either way the dot itself
+  // stays centred on the point.
+  const labelOnLeft = item.x > 0.3;
+  const halfSize = size / 2;
+  const transform = labelOnLeft
+    ? `translate(calc(-100% + ${halfSize}px), -50%)`
+    : `translate(${-halfSize}px, -50%)`;
+  const tooltipVerticalClass = item.y > 0 ? "top-full mt-1.5" : "bottom-full mb-1.5";
 
   return (
     <button
       type="button"
       data-matrix-interactive="true"
-      className="absolute z-10 w-44 -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-2 text-left shadow-sm transition hover:z-50 hover:border-ring hover:shadow-md focus-visible:z-50 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      style={matrixPosition(item.x, item.y, viewport)}
+      className={`group absolute z-10 flex items-center gap-1.5 hover:z-50 focus-visible:z-50 focus-visible:outline-none ${
+        labelOnLeft ? "flex-row-reverse" : "flex-row"
+      }`}
+      style={{ left: position.left, top: position.top, transform }}
       onClick={() => onClick(plan)}
+      title={plan.title}
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="line-clamp-2 text-sm font-medium leading-snug">
-          {plan.title}
+      <span
+        className={`block shrink-0 rounded-full shadow-sm ring-2 ring-background transition group-hover:scale-110 ${
+          quadrantDotClass[item.quadrant]
+        }`}
+        style={{ width: size, height: size }}
+      />
+      <span className="max-w-[100px] truncate text-[11px] font-medium text-foreground/80">
+        {plan.title}
+      </span>
+
+      <span
+        className={`pointer-events-none absolute left-1/2 z-50 hidden w-44 -translate-x-1/2 flex-col gap-0.5 rounded-md border bg-popover px-2 py-1.5 text-left shadow-lg group-hover:flex ${tooltipVerticalClass}`}
+      >
+        <span className="flex items-center justify-between gap-2">
+          <span className="line-clamp-2 text-xs font-medium text-popover-foreground">
+            {plan.title}
+          </span>
+          <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
+            {plan.importanceScore}
+          </Badge>
         </span>
-        <Badge variant="outline" className="shrink-0">
-          {plan.importanceScore}
-        </Badge>
-      </div>
-      <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-        <Clock3 className="size-3" />
-        {formatTimePressure(plan.endAt ?? plan.startAt, now)}
-      </div>
+        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <Clock3 className="size-3" />
+          {formatTimePressure(plan.endAt ?? plan.startAt, now)}
+        </span>
+      </span>
     </button>
   );
 }
 
-function MatrixClusterCard({
+// Defensive fallback: clusters are disabled in the scatter view, but if one is
+// ever produced it renders as a single labelled dot opening the top plan.
+function MatrixClusterDot({
   item,
-  now,
   viewport,
-  onPlanClick,
+  onClick,
 }: {
   item: MatrixClusterLayoutItem;
-  now: Date;
   viewport: MatrixViewport;
-  onPlanClick: (plan: Plan) => void;
+  onClick: (plan: Plan) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const strongestPlan = item.plans.reduce((strongest, plan) =>
     plan.importanceScore > strongest.importanceScore ? plan : strongest,
   );
-  const previewTitle = item.plans
-    .slice(0, 2)
-    .map((plan) => plan.title)
-    .join(" / ");
-  const panelVerticalClass = item.quadrant.startsWith("important")
-    ? "top-[calc(100%+0.5rem)]"
-    : "bottom-[calc(100%+0.5rem)]";
-
-  function handleBlur(event: FocusEvent<HTMLDivElement>) {
-    const nextTarget = event.relatedTarget;
-
-    if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
-      setExpanded(false);
-    }
-  }
 
   return (
-    <div
+    <button
+      type="button"
       data-matrix-interactive="true"
-      className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:z-50 focus-within:z-50"
+      className="group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 hover:z-50 focus-visible:z-50 focus-visible:outline-none"
       style={matrixPosition(item.x, item.y, viewport)}
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
-      onFocusCapture={() => setExpanded(true)}
-      onBlurCapture={handleBlur}
+      onClick={() => onClick(strongestPlan)}
+      title={item.plans.map((plan) => plan.title).join("、")}
     >
-      <button
-        type="button"
-        className="w-48 rounded-lg border border-dashed bg-card p-2 text-left shadow-sm transition hover:border-ring hover:shadow-md focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        onClick={() => setExpanded((current) => !current)}
+      <span
+        className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white shadow-sm ring-2 ring-background ${
+          quadrantDotClass[item.quadrant]
+        }`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 text-sm font-medium">
-            <Layers3 className="size-4" />
-            {item.plans.length} 个计划
-          </span>
-          <Badge variant="outline" className="shrink-0">
-            {strongestPlan.importanceScore}
-          </Badge>
-        </div>
-        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-          {previewTitle}
-        </p>
-      </button>
-
-      {expanded ? (
-        <div
-          data-matrix-wheel-lock="true"
-          className={`absolute left-1/2 z-50 w-64 -translate-x-1/2 overscroll-contain rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg ${panelVerticalClass}`}
-        >
-          <div className="grid max-h-64 gap-1 overflow-auto">
-            {item.plans.map((plan) => (
-              <button
-                key={plan.id}
-                type="button"
-                className="rounded-md p-2 text-left transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
-                onClick={() => onPlanClick(plan)}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="line-clamp-2 text-sm font-medium">
-                    {plan.title}
-                  </span>
-                  <Badge variant="outline" className="shrink-0">
-                    {plan.importanceScore}
-                  </Badge>
-                </div>
-                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock3 className="size-3" />
-                  {formatTimePressure(plan.endAt ?? plan.startAt, now)}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
+        {item.plans.length}
+      </span>
+      <span className="flex items-center gap-1 text-[11px] font-medium text-foreground/80">
+        <Layers3 className="size-3" />
+        {item.plans.length} 项
+      </span>
+    </button>
   );
 }
 
@@ -520,28 +546,23 @@ function matrixPosition(x: number, y: number, viewport: MatrixViewport) {
   });
 }
 
+const quadrantLabelCornerClass: Record<"tl" | "tr" | "bl" | "br", string> = {
+  tl: "left-3 top-3",
+  tr: "right-3 top-3",
+  bl: "left-3 bottom-3",
+  br: "right-3 bottom-3",
+};
+
 function QuadrantLabel({
   title,
-  viewport,
-  xPercent,
-  yPercent,
-  anchorX = "left",
-  anchorY = "top",
+  corner,
 }: {
   title: string;
-  viewport: MatrixViewport;
-  xPercent: number;
-  yPercent: number;
-  anchorX?: "left" | "right";
-  anchorY?: "top" | "bottom";
+  corner: "tl" | "tr" | "bl" | "br";
 }) {
-  const translateX = anchorX === "right" ? "-translate-x-full" : "";
-  const translateY = anchorY === "bottom" ? "-translate-y-full" : "";
-
   return (
     <div
-      className={`absolute z-20 rounded-md bg-muted px-2 py-1 text-xs ${translateX} ${translateY}`}
-      style={getMatrixViewportCssPoint(viewport, { xPercent, yPercent })}
+      className={`pointer-events-none absolute z-30 rounded-md bg-muted/90 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur-sm ${quadrantLabelCornerClass[corner]}`}
     >
       {title}
     </div>

@@ -26,8 +26,7 @@ import {
   type CalendarMode,
   type CalendarSpan,
 } from "@/domain/calendar";
-import { importantScoreThreshold } from "@/domain/importance";
-import type { Plan } from "@/domain/plan";
+import { getPlanQuadrant, type MatrixQuadrant, type Plan } from "@/domain/plan";
 import { formatPlanTime } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
 
@@ -41,6 +40,18 @@ const markerLabels: Record<CalendarMarkerKind, string> = {
   end: "截止",
 };
 
+// Calendar bars/chips reuse the matrix quadrant palette (red/amber/sky/slate).
+const quadrantBarClass: Record<MatrixQuadrant, string> = {
+  "important-urgent":
+    "border-rose-300 bg-rose-50 text-rose-950 hover:bg-rose-100",
+  "important-not-urgent":
+    "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100",
+  "not-important-urgent":
+    "border-sky-300 bg-sky-50 text-sky-950 hover:bg-sky-100",
+  "not-important-not-urgent":
+    "border-slate-300 bg-slate-50 text-slate-800 hover:bg-slate-100",
+};
+
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function CalendarView({ plans, now }: CalendarViewProps) {
@@ -49,13 +60,12 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
   const [calendarAnchor, setCalendarAnchor] = useState(now);
   const days = getCalendarDays(mode, calendarAnchor);
   const weeks = chunkIntoWeeks(days);
-  const unscheduledPlans = getUnscheduledPlans(plans);
+  // 已完成计划不在日历中展示。
+  const calendarPlans = plans.filter(
+    (plan) => plan.storedStatus !== "completed",
+  );
+  const unscheduledPlans = getUnscheduledPlans(calendarPlans);
   const periodLabel = getCalendarHeaderLabel(mode, calendarAnchor);
-
-  function showWeek(weekStart: Date) {
-    setCalendarAnchor(weekStart);
-    setMode("week");
-  }
 
   return (
     <div className="grid min-h-0 grid-cols-[1fr_300px] gap-4">
@@ -142,14 +152,7 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
             className={
               mode === "week"
                 ? "min-h-0 overflow-y-auto overscroll-contain"
-                : "grid min-h-0 overflow-hidden"
-            }
-            style={
-              mode === "month"
-                ? {
-                    gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))`,
-                  }
-                : undefined
+                : "grid min-h-0 auto-rows-min overflow-y-auto overscroll-contain"
             }
           >
             {weeks.map((week) => (
@@ -158,9 +161,9 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
                 week={week}
                 anchor={calendarAnchor}
                 mode={mode}
-                plans={plans}
+                plans={calendarPlans}
+                now={now}
                 onOpenPlan={openEditDialog}
-                onShowWeek={showWeek}
               />
             ))}
           </div>
@@ -210,15 +213,15 @@ function CalendarWeekRow({
   anchor,
   mode,
   plans,
+  now,
   onOpenPlan,
-  onShowWeek,
 }: {
   week: Date[];
   anchor: Date;
   mode: CalendarMode;
   plans: Plan[];
+  now: Date;
   onOpenPlan: (plan: Plan) => void;
-  onShowWeek: (weekStart: Date) => void;
 }) {
   const spans = getCalendarSpansForWeek(plans, week);
   const display = getCalendarWeekDisplay(mode, spans.length);
@@ -229,7 +232,11 @@ function CalendarWeekRow({
       className={`relative grid grid-cols-7 border-b last:border-b-0 ${
         mode === "week" ? "overflow-visible" : "min-h-0 overflow-hidden"
       }`}
-      style={mode === "week" ? { minHeight: display.minRowHeight } : undefined}
+      style={
+        mode === "week"
+          ? { minHeight: display.minRowHeight }
+          : { minHeight: Math.max(112, display.pointOffset + 12) }
+      }
     >
       {week.map((day) => (
         <CalendarDayCell
@@ -237,6 +244,7 @@ function CalendarWeekRow({
           day={day}
           anchor={anchor}
           mode={mode}
+          now={now}
           pointOffset={display.pointOffset}
           entries={getCalendarEntriesForDay(plans, day)}
           onOpenPlan={onOpenPlan}
@@ -249,17 +257,10 @@ function CalendarWeekRow({
           span={span}
           lane={index}
           mode={mode}
+          now={now}
           onClick={() => onOpenPlan(span.plan)}
         />
       ))}
-
-      {display.hiddenSpanCount > 0 && mode === "month" ? (
-        <CalendarHiddenSpansButton
-          count={display.hiddenSpanCount}
-          lane={display.visibleSpanCount}
-          onClick={() => onShowWeek(week[0] ?? anchor)}
-        />
-      ) : null}
     </div>
   );
 }
@@ -268,6 +269,7 @@ function CalendarDayCell({
   day,
   anchor,
   mode,
+  now,
   pointOffset,
   entries,
   onOpenPlan,
@@ -275,6 +277,7 @@ function CalendarDayCell({
   day: Date;
   anchor: Date;
   mode: CalendarMode;
+  now: Date;
   pointOffset: number;
   entries: CalendarEntry[];
   onOpenPlan: (plan: Plan) => void;
@@ -289,7 +292,9 @@ function CalendarDayCell({
     >
       <div className="flex items-start justify-between gap-2">
         <span
-          className={`flex size-7 items-center justify-center rounded-md text-sm font-semibold tabular-nums ${
+          className={`flex h-7 items-center justify-center rounded-md text-sm font-semibold tabular-nums whitespace-nowrap ${
+            mode === "week" ? "w-auto px-1.5" : "size-7"
+          } ${
             isToday(day)
               ? "bg-primary text-primary-foreground"
               : "text-foreground"
@@ -313,6 +318,7 @@ function CalendarDayCell({
             key={`${day.toISOString()}-${entry.plan.id}`}
             entry={entry}
             compact={mode === "month"}
+            now={now}
             onClick={() => onOpenPlan(entry.plan)}
           />
         ))}
@@ -321,50 +327,21 @@ function CalendarDayCell({
   );
 }
 
-function CalendarHiddenSpansButton({
-  count,
-  lane,
-  onClick,
-}: {
-  count: number;
-  lane: number;
-  onClick: () => void;
-}) {
-  const style: CSSProperties = {
-    left: "6px",
-    right: "6px",
-    top: 42 + lane * 24,
-  };
-
-  return (
-    <button
-      type="button"
-      className="absolute z-10 flex h-6 items-center justify-center rounded-md border border-dashed bg-muted/80 px-2 text-xs font-medium text-muted-foreground transition hover:border-ring hover:bg-muted hover:text-foreground"
-      style={style}
-      onClick={onClick}
-      title="切到这一周查看全部任务条"
-    >
-      +{count} 更多，切到周视图
-    </button>
-  );
-}
-
 function CalendarSpanBar({
   span,
   lane,
   mode,
+  now,
   onClick,
 }: {
   span: CalendarSpan;
   lane: number;
   mode: CalendarMode;
+  now: Date;
   onClick: () => void;
 }) {
   const top = mode === "month" ? 42 + lane * 24 : 46 + lane * 30;
-  const colorClass =
-    span.plan.importanceScore >= importantScoreThreshold
-      ? "border-emerald-300 bg-emerald-50 text-emerald-950 hover:bg-emerald-100"
-      : "border-sky-200 bg-sky-50 text-sky-950 hover:bg-sky-100";
+  const colorClass = quadrantBarClass[getPlanQuadrant(span.plan, now)];
   const style: CSSProperties = {
     left: `calc(${(span.startIndex / 7) * 100}% + 6px)`,
     width: `calc(${((span.endIndex - span.startIndex + 1) / 7) * 100}% - 12px)`,
@@ -394,12 +371,29 @@ function CalendarSpanBar({
 function CalendarPointCard({
   entry,
   compact,
+  now,
   onClick,
 }: {
   entry: CalendarEntry;
   compact: boolean;
+  now: Date;
   onClick: () => void;
 }) {
+  if (compact) {
+    return (
+      <button
+        type="button"
+        className={`flex w-full items-center gap-1 overflow-hidden rounded-md border px-2 py-1 text-left text-xs shadow-sm transition hover:border-ring ${
+          quadrantBarClass[getPlanQuadrant(entry.plan, now)]
+        }`}
+        onClick={onClick}
+        title={entry.plan.title}
+      >
+        <span className="truncate font-medium">{entry.plan.title}</span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -408,11 +402,9 @@ function CalendarPointCard({
     >
       <div className="flex items-center gap-1">
         <span className="truncate font-medium">{entry.plan.title}</span>
-        {!compact ? (
-          <Badge variant="outline" className="ml-auto shrink-0">
-            {entry.plan.importanceScore}
-          </Badge>
-        ) : null}
+        <Badge variant="outline" className="ml-auto shrink-0">
+          {entry.plan.importanceScore}
+        </Badge>
       </div>
       <div className="mt-1 grid gap-1">
         {entry.markers.map((marker) => (

@@ -211,12 +211,13 @@ describe("getCalendarHeaderLabel", () => {
 });
 
 describe("getCalendarWeekDisplay", () => {
-  test("keeps month view compact by hiding dense lanes", () => {
+  test("shows every span in month view and grows the row downward", () => {
     const display = getCalendarWeekDisplay("month", 5);
 
-    expect(display.visibleSpanCount).toBe(2);
-    expect(display.hiddenSpanCount).toBe(3);
+    expect(display.visibleSpanCount).toBe(5);
+    expect(display.hiddenSpanCount).toBe(0);
     expect(display.canScroll).toBe(false);
+    expect(display.pointOffset).toBe(38 + 5 * 24);
   });
 
   test("shows all span lanes in week mode and allows the row to grow", () => {

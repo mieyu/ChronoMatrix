@@ -20,6 +20,15 @@ export interface MatrixLayoutRules {
   clusterRadius: number;
   clusterMinSize: number;
   collisionOffset: number;
+  /**
+   * Half of a card's width/height expressed in normalized matrix units
+   * (1 unit == 42% of the canvas). When greater than zero, a relaxation pass
+   * pushes overlapping cards apart so none occlude each other. Defaults to 0,
+   * which keeps the layout a pure target-driven placement (used by tests).
+   */
+  cardHalfWidth?: number;
+  cardHalfHeight?: number;
+  relaxIterations?: number;
 }
 
 export interface MatrixPlanLayoutItem {
@@ -98,13 +107,108 @@ function layoutQuadrant(
 ): MatrixLayoutItem[] {
   const groups = collectNearbyGroups(candidates, rules.clusterRadius);
 
-  return groups.flatMap<MatrixLayoutItem>((group) => {
+  const items = groups.flatMap<MatrixLayoutItem>((group) => {
     if (group.length >= rules.clusterMinSize) {
       return [createClusterItem(group)];
     }
 
     return spreadPlanItems(group, rules.collisionOffset);
   });
+
+  return relaxOverlaps(items, rules);
+}
+
+/**
+ * Iteratively separates overlapping cards so the matrix can be read at a
+ * glance. Each card is treated as an axis-aligned box; overlapping pairs are
+ * pushed apart along the axis of least penetration, while a weak spring keeps
+ * every card drifting back toward its meaningful position. No-op when the
+ * caller did not provide a card footprint.
+ */
+function relaxOverlaps(
+  items: MatrixLayoutItem[],
+  rules: MatrixLayoutRules,
+): MatrixLayoutItem[] {
+  const halfWidth = rules.cardHalfWidth ?? 0;
+  const halfHeight = rules.cardHalfHeight ?? 0;
+
+  if (halfWidth <= 0 || halfHeight <= 0 || items.length < 2) {
+    return items;
+  }
+
+  const minGapX = halfWidth * 2;
+  const minGapY = halfHeight * 2;
+  const iterations = rules.relaxIterations ?? 60;
+  const home = items.map((item) => ({
+    x: item.x,
+    y: item.y,
+    quadrant: item.quadrant,
+  }));
+  const positions = items.map((item) => ({ x: item.x, y: item.y }));
+
+  function separateOverlaps() {
+    for (let i = 0; i < positions.length; i += 1) {
+      for (let j = i + 1; j < positions.length; j += 1) {
+        const dx = positions[j].x - positions[i].x;
+        const dy = positions[j].y - positions[i].y;
+        const penetrationX = minGapX - Math.abs(dx);
+        const penetrationY = minGapY - Math.abs(dy);
+
+        if (penetrationX <= 0 || penetrationY <= 0) {
+          continue;
+        }
+
+        if (penetrationX <= penetrationY) {
+          const shift = (penetrationX / 2) * (dx === 0 ? -1 : Math.sign(dx));
+          positions[i].x -= shift;
+          positions[j].x += shift;
+        } else {
+          const shift = (penetrationY / 2) * (dy === 0 ? -1 : Math.sign(dy));
+          positions[i].y -= shift;
+          positions[j].y += shift;
+        }
+      }
+    }
+  }
+
+  function clampAll() {
+    for (let i = 0; i < positions.length; i += 1) {
+      const clamped = clampToQuadrant(
+        positions[i].x,
+        positions[i].y,
+        home[i].quadrant,
+      );
+      positions[i].x = clamped.x;
+      positions[i].y = clamped.y;
+    }
+  }
+
+  // Main pass: push cards apart while a weak spring keeps them near their
+  // meaningful position.
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    separateOverlaps();
+
+    for (let i = 0; i < positions.length; i += 1) {
+      positions[i].x += (home[i].x - positions[i].x) * 0.03;
+      positions[i].y += (home[i].y - positions[i].y) * 0.03;
+    }
+
+    clampAll();
+  }
+
+  // Settle pass: pure separation (no spring) so the final layout actually
+  // honors the no-overlap invariant rather than ending mid-spring.
+  for (let iteration = 0; iteration < 12; iteration += 1) {
+    separateOverlaps();
+    clampAll();
+  }
+
+  items.forEach((item, index) => {
+    item.x = positions[index].x;
+    item.y = positions[index].y;
+  });
+
+  return items;
 }
 
 function collectNearbyGroups(

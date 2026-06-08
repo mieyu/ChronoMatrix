@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   buildMatrixLayoutItems,
+  defaultMatrixLayoutRules,
   type MatrixClusterLayoutItem,
   type MatrixPlanLayoutItem,
 } from "./matrixLayout";
-import type { Plan } from "./plan";
+import { defaultMatrixRules, type Plan } from "./plan";
 
 const now = new Date("2026-06-05T10:00:00.000Z");
 
@@ -112,6 +113,32 @@ describe("buildMatrixLayoutItems", () => {
     expect(plans[0].quadrant).toBe("important-not-urgent");
     expect(plans[0].x).toBeLessThan(0);
     expect(plans[0].y).toBeGreaterThan(0);
+  });
+
+  test("separates overlapping cards when a card footprint is provided", () => {
+    const halfWidth = 0.18;
+    const halfHeight = 0.12;
+    const items = buildMatrixLayoutItems(
+      [
+        plan({ id: "alpha", title: "Alpha" }),
+        plan({ id: "beta", title: "Beta" }),
+      ],
+      now,
+      defaultMatrixRules,
+      {
+        ...defaultMatrixLayoutRules,
+        cardHalfWidth: halfWidth,
+        cardHalfHeight: halfHeight,
+      },
+    );
+
+    const plans = planItems(items);
+
+    expect(plans).toHaveLength(2);
+    const dx = Math.abs(plans[0].x - plans[1].x);
+    const dy = Math.abs(plans[0].y - plans[1].y);
+    // Boxes must not overlap: clear on at least one axis.
+    expect(dx >= halfWidth * 2 || dy >= halfHeight * 2).toBe(true);
   });
 
   test("does not cluster nearby plans across quadrant boundaries", () => {

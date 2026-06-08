@@ -125,6 +125,29 @@ export function getPlanMatrixPlacement(
   };
 }
 
+/**
+ * Resolves the matrix quadrant for a plan purely from importance + urgency,
+ * always returning a quadrant (overdue plans count as urgent). Used for
+ * consistent quadrant-based coloring outside the matrix, e.g. the calendar.
+ */
+export function getPlanQuadrant(
+  plan: Plan,
+  now: Date = new Date(),
+  rules: MatrixRules = defaultMatrixRules,
+): MatrixQuadrant {
+  const important = plan.importanceScore >= rules.importantThreshold;
+  const referenceAt = plan.endAt ?? plan.startAt;
+
+  if (!referenceAt) {
+    return getQuadrant(important, false);
+  }
+
+  const timeLeftMs = differenceInMilliseconds(new Date(referenceAt), now);
+  const urgent = timeLeftMs <= rules.urgentWindowHours * 60 * 60 * 1000;
+
+  return getQuadrant(important, urgent);
+}
+
 function getQuadrant(important: boolean, urgent: boolean): MatrixQuadrant {
   if (important && urgent) {
     return "important-urgent";
