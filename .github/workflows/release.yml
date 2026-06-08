@@ -73,6 +73,12 @@ jobs:
         with:
           targets: ${{ matrix.rust_targets }}
 
+      - name: Install Rust targets for pinned toolchain
+        shell: bash
+        env:
+          RUST_TARGETS: ${{ matrix.rust_targets }}
+        run: rustup target add ${RUST_TARGETS//,/ }
+
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
