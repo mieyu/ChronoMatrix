@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { markReminderKeysSent, listSentReminderKeys } from "@/data/reminders";
 import {
   buildPlanReminderCandidates,
@@ -17,8 +17,10 @@ interface ReminderRunnerProps {
 const maxNotificationsPerPass = 3;
 
 export function ReminderRunner({ plans, now, rules }: ReminderRunnerProps) {
+  const inFlightRef = useRef(false);
+
   useEffect(() => {
-    if (!isTauriRuntime()) {
+    if (!isTauriRuntime() || inFlightRef.current) {
       return;
     }
 
@@ -33,7 +35,10 @@ export function ReminderRunner({ plans, now, rules }: ReminderRunnerProps) {
       return;
     }
 
-    void sendReminderNotifications(candidates);
+    inFlightRef.current = true;
+    void sendReminderNotifications(candidates).finally(() => {
+      inFlightRef.current = false;
+    });
   }, [now, plans, rules]);
 
   return null;

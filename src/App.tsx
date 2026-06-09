@@ -34,9 +34,9 @@ import {
   type Plan,
 } from "@/domain/plan";
 import {
+  defaultAppSettings,
   getMatrixRulesFromSettings,
   getReminderRulesFromSettings,
-  type AppSettings,
 } from "@/domain/settings";
 import { useSettingsStore } from "@/state/settings";
 import { useUiStore, type AppView } from "@/state/ui";
@@ -58,7 +58,6 @@ function App() {
   const openSettings = useUiStore((state) => state.openSettings);
   const dialogOpen = useUiStore((state) => state.dialogOpen);
   const editingPlan = useUiStore((state) => state.editingPlan);
-  const defaultView = useSettingsStore((state) => state.defaultView);
   const importantThreshold = useSettingsStore(
     (state) => state.importantThreshold,
   );
@@ -115,29 +114,23 @@ function App() {
     };
   }, []);
 
-  const settings = useMemo<AppSettings>(
-    () => ({
-      defaultView,
-      importantThreshold,
-      urgentWindowHours,
-      remindersEnabled,
-      reminderLeadMinutes,
-    }),
-    [
-      defaultView,
-      importantThreshold,
-      reminderLeadMinutes,
-      remindersEnabled,
-      urgentWindowHours,
-    ],
-  );
   const matrixRules = useMemo(
-    () => getMatrixRulesFromSettings(settings),
-    [settings],
+    () =>
+      getMatrixRulesFromSettings({
+        ...defaultAppSettings,
+        importantThreshold,
+        urgentWindowHours,
+      }),
+    [importantThreshold, urgentWindowHours],
   );
   const reminderRules = useMemo(
-    () => getReminderRulesFromSettings(settings),
-    [settings],
+    () =>
+      getReminderRulesFromSettings({
+        ...defaultAppSettings,
+        remindersEnabled,
+        reminderLeadMinutes,
+      }),
+    [reminderLeadMinutes, remindersEnabled],
   );
   const plans = plansQuery.data ?? [];
   const stats = useMemo(() => getStats(plans, now), [plans, now]);
