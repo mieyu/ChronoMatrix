@@ -34,6 +34,13 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: STORAGE_KEY,
+      partialize: (state) => ({
+        defaultView: state.defaultView,
+        importantThreshold: state.importantThreshold,
+        urgentWindowHours: state.urgentWindowHours,
+        remindersEnabled: state.remindersEnabled,
+        reminderLeadMinutes: state.reminderLeadMinutes,
+      }),
       merge: (persisted, current) => ({
         ...current,
         ...normalizeAppSettings(persisted),
