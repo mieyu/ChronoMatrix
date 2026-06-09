@@ -300,6 +300,11 @@ function SliderSetting({
         id={id}
         aria-labelledby={labelId}
         aria-describedby={descriptionId}
+        thumbProps={{
+          "aria-labelledby": labelId,
+          "aria-describedby": descriptionId,
+          "aria-valuetext": valueLabel,
+        }}
         min={min}
         max={max}
         step={step}
