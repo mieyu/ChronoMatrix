@@ -4,7 +4,6 @@ import {
   minImportanceScore,
 } from "./importance";
 import { defaultMatrixRules, type MatrixRules } from "./plan";
-import type { PlanReminderRules } from "./reminders";
 
 export type SettingsView = "today" | "matrix" | "calendar" | "list" | "review";
 
@@ -14,6 +13,11 @@ export interface AppSettings {
   urgentWindowHours: number;
   remindersEnabled: boolean;
   reminderLeadMinutes: number;
+}
+
+export interface SettingsReminderRules {
+  enabled: boolean;
+  dueSoonMinutes: number;
 }
 
 export const defaultAppSettings: AppSettings = {
@@ -74,7 +78,7 @@ export function getMatrixRulesFromSettings(settings: AppSettings): MatrixRules {
 
 export function getReminderRulesFromSettings(
   settings: AppSettings,
-): PlanReminderRules {
+): SettingsReminderRules {
   const normalized = normalizeAppSettings(settings);
 
   return {
