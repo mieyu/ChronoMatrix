@@ -16,6 +16,14 @@ export interface TodaySection {
   plans: Plan[];
 }
 
+export interface TodayRules {
+  importantThreshold: number;
+}
+
+const defaultTodayRules: TodayRules = {
+  importantThreshold: importantScoreThreshold,
+};
+
 const sectionMeta: Omit<TodaySection, "plans">[] = [
   {
     id: "expired",
@@ -46,6 +54,7 @@ const sectionMeta: Omit<TodaySection, "plans">[] = [
 export function buildTodaySections(
   plans: Plan[],
   now = new Date(),
+  rules: TodayRules = defaultTodayRules,
 ): TodaySection[] {
   const groups: Record<TodaySectionId, Plan[]> = {
     expired: [],
@@ -55,7 +64,7 @@ export function buildTodaySections(
   };
 
   for (const plan of plans) {
-    const section = getTodaySectionId(plan, now);
+    const section = getTodaySectionId(plan, now, rules);
 
     if (section) {
       groups[section].push(plan);
@@ -81,7 +90,11 @@ export function getTodayPlanCount(sections: TodaySection[]): number {
   return sections.reduce((total, section) => total + section.plans.length, 0);
 }
 
-function getTodaySectionId(plan: Plan, now: Date): TodaySectionId | null {
+function getTodaySectionId(
+  plan: Plan,
+  now: Date,
+  rules: TodayRules,
+): TodaySectionId | null {
   const effectiveStatus = deriveEffectiveStatus(plan, now);
 
   if (effectiveStatus === "completed" || effectiveStatus === "archived") {
@@ -100,7 +113,11 @@ function getTodaySectionId(plan: Plan, now: Date): TodaySectionId | null {
     return "starts_today";
   }
 
-  if (!plan.startAt && !plan.endAt && plan.importanceScore >= importantScoreThreshold) {
+  if (
+    !plan.startAt &&
+    !plan.endAt &&
+    plan.importanceScore >= rules.importantThreshold
+  ) {
     return "important_unscheduled";
   }
 

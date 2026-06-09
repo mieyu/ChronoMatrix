@@ -84,6 +84,21 @@ describe("buildTodaySections", () => {
     expect(sectionIds([important]).important_unscheduled).toEqual(["important"]);
   });
 
+  test("uses a custom important threshold for important unscheduled plans", () => {
+    const important = plan({
+      id: "below-custom-threshold",
+      importanceScore: 7,
+    });
+
+    const sections = Object.fromEntries(
+      buildTodaySections([important], now, { importantThreshold: 8 }).map(
+        (section) => [section.id, section.plans.map((item) => item.id)],
+      ),
+    );
+
+    expect(sections.important_unscheduled).toEqual([]);
+  });
+
   test("excludes completed and archived plans", () => {
     const completed = plan({
       id: "completed",

@@ -120,6 +120,38 @@ describe("buildPlanReminderCandidates", () => {
     );
   });
 
+  test("returns no candidates when reminders are disabled", () => {
+    const candidates = buildPlanReminderCandidates(
+      [
+        plan({
+          id: "due-soon",
+          endAt: "2026-06-06T10:59:00.000Z",
+        }),
+      ],
+      now,
+      new Set(),
+      { enabled: false, dueSoonMinutes: 30 },
+    );
+
+    expect(candidates).toEqual([]);
+  });
+
+  test("does not create due-soon reminders when the lead time is zero", () => {
+    const candidates = buildPlanReminderCandidates(
+      [
+        plan({
+          id: "due-now",
+          endAt: "2026-06-06T10:30:00.000Z",
+        }),
+      ],
+      now,
+      new Set(),
+      { enabled: true, dueSoonMinutes: 0 },
+    );
+
+    expect(candidates).toEqual([]);
+  });
+
   test("changes the reminder key when a plan deadline changes", () => {
     const original = plan({
       id: "moved",

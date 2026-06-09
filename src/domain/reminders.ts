@@ -10,10 +10,12 @@ export interface PlanReminderCandidate {
 }
 
 export interface PlanReminderRules {
+  enabled: boolean;
   dueSoonMinutes: number;
 }
 
 const defaultRules: PlanReminderRules = {
+  enabled: true,
   dueSoonMinutes: 30,
 };
 
@@ -23,6 +25,10 @@ export function buildPlanReminderCandidates(
   sentKeys: ReadonlySet<string>,
   rules: PlanReminderRules = defaultRules,
 ): PlanReminderCandidate[] {
+  if (!rules.enabled) {
+    return [];
+  }
+
   return plans
     .flatMap((plan) => getPlanReminderCandidate(plan, now, sentKeys, rules))
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
@@ -54,10 +60,14 @@ function getPlanReminderCandidate(
   const dueAt = new Date(plan.endAt);
   const dueSoonWindowMs = rules.dueSoonMinutes * 60 * 1000;
   const timeUntilDueMs = dueAt.getTime() - now.getTime();
+  const dueSoon =
+    rules.dueSoonMinutes > 0 &&
+    timeUntilDueMs >= 0 &&
+    timeUntilDueMs <= dueSoonWindowMs;
   const kind =
     status === "expired"
       ? "expired"
-      : timeUntilDueMs >= 0 && timeUntilDueMs <= dueSoonWindowMs
+      : dueSoon
         ? "due_soon"
         : null;
 

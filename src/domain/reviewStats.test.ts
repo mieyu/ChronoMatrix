@@ -215,4 +215,27 @@ describe("buildReviewStats", () => {
       "important-unscheduled",
     ]);
   });
+
+  test("uses custom matrix rules for quadrant review and important unscheduled plans", () => {
+    const stats = buildReviewStats(
+      [
+        plan({
+          id: "below-custom-threshold",
+          importanceScore: 7,
+          endAt: "2026-06-06T11:00:00.000Z",
+        }),
+        plan({
+          id: "unscheduled-below-custom-threshold",
+          importanceScore: 7,
+        }),
+      ],
+      new Date("2026-06-06T10:30:00.000Z"),
+      "this_week",
+      { urgentWindowHours: 72, pressureHorizonDays: 14, importantThreshold: 8 },
+    );
+
+    expect(stats.quadrants["not-important-urgent"].total).toBe(1);
+    expect(stats.quadrants["important-urgent"].total).toBe(0);
+    expect(stats.importantUnscheduledPlans).toEqual([]);
+  });
 });

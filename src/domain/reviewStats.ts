@@ -1,9 +1,9 @@
 import { format, startOfDay, startOfWeek, subDays } from "date-fns";
-import { importantScoreThreshold } from "./importance";
 import {
   defaultMatrixRules,
   deriveEffectiveStatus,
   type MatrixQuadrant,
+  type MatrixRules,
   type Plan,
 } from "./plan";
 
@@ -87,6 +87,7 @@ export function buildReviewStats(
   plans: Plan[],
   now: Date,
   periodId: ReviewPeriodId,
+  matrixRules: MatrixRules = defaultMatrixRules,
 ): ReviewStats {
   const period = getReviewPeriodRange(periodId, now);
   const createdPlans = plans.filter((plan) => isInPeriod(plan.createdAt, period));
@@ -109,7 +110,7 @@ export function buildReviewStats(
         status !== "expired" &&
         !plan.startAt &&
         !plan.endAt &&
-        isImportant(plan)
+        isImportant(plan, matrixRules.importantThreshold)
       );
     })
     .sort((a, b) => {
@@ -124,7 +125,7 @@ export function buildReviewStats(
       continue;
     }
 
-    const quadrant = getCurrentReviewQuadrant(plan, now);
+    const quadrant = getCurrentReviewQuadrant(plan, now, matrixRules);
 
     if (!quadrant) {
       continue;
@@ -153,8 +154,12 @@ export function buildReviewStats(
           ? 0
           : completedCreatedPlans.length / createdPlans.length,
       expiredCount: expiredPlans.length,
-      completedImportantCount: completedPlans.filter(isImportant).length,
-      expiredImportantCount: expiredPlans.filter(isImportant).length,
+      completedImportantCount: completedPlans.filter((plan) =>
+        isImportant(plan, matrixRules.importantThreshold),
+      ).length,
+      expiredImportantCount: expiredPlans.filter((plan) =>
+        isImportant(plan, matrixRules.importantThreshold),
+      ).length,
     },
     quadrants,
     quadrantSummaries: quadrantOrder.map((quadrant) => quadrants[quadrant]),
@@ -183,6 +188,7 @@ function createEmptyQuadrants(): Record<MatrixQuadrant, ReviewQuadrantStats> {
 function getCurrentReviewQuadrant(
   plan: Plan,
   now: Date,
+  matrixRules: MatrixRules,
 ): MatrixQuadrant | null {
   const referenceAt = plan.endAt ?? plan.startAt;
 
@@ -191,9 +197,9 @@ function getCurrentReviewQuadrant(
   }
 
   const referenceTime = new Date(referenceAt).getTime();
-  const urgentWindowMs = defaultMatrixRules.urgentWindowHours * 60 * 60 * 1000;
+  const urgentWindowMs = matrixRules.urgentWindowHours * 60 * 60 * 1000;
   const urgent = referenceTime - now.getTime() <= urgentWindowMs;
-  const important = isImportant(plan);
+  const important = isImportant(plan, matrixRules.importantThreshold);
 
   if (important && urgent) {
     return "important-urgent";
@@ -210,8 +216,8 @@ function getCurrentReviewQuadrant(
   return "not-important-not-urgent";
 }
 
-function isImportant(plan: Plan): boolean {
-  return plan.importanceScore >= importantScoreThreshold;
+function isImportant(plan: Plan, importantThreshold: number): boolean {
+  return plan.importanceScore >= importantThreshold;
 }
 
 function isInPeriod(value: string | null, period: ReviewPeriodRange): boolean {
