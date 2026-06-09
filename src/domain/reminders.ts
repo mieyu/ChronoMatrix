@@ -34,6 +34,31 @@ export function buildPlanReminderCandidates(
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
 }
 
+export function filterPlanReminderCandidatesForRules(
+  candidates: PlanReminderCandidate[],
+  now: Date,
+  rules: PlanReminderRules,
+): PlanReminderCandidate[] {
+  if (rules.enabled === false) {
+    return [];
+  }
+
+  return candidates.filter((candidate) => {
+    if (candidate.kind === "expired") {
+      return true;
+    }
+
+    if (rules.dueSoonMinutes <= 0) {
+      return false;
+    }
+
+    const timeUntilDueMs = new Date(candidate.dueAt).getTime() - now.getTime();
+    const dueSoonWindowMs = rules.dueSoonMinutes * 60 * 1000;
+
+    return timeUntilDueMs >= 0 && timeUntilDueMs <= dueSoonWindowMs;
+  });
+}
+
 export function getPlanReminderKey(
   plan: Plan,
   kind: PlanReminderKind,

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { markReminderKeysSent, listSentReminderKeys } from "@/data/reminders";
 import {
   buildPlanReminderCandidates,
+  filterPlanReminderCandidatesForRules,
   type PlanReminderCandidate,
   type PlanReminderRules,
 } from "@/domain/reminders";
@@ -18,6 +19,11 @@ const maxNotificationsPerPass = 3;
 
 export function ReminderRunner({ plans, now, rules }: ReminderRunnerProps) {
   const inFlightRef = useRef(false);
+  const latestContextRef = useRef({ now, rules });
+
+  useEffect(() => {
+    latestContextRef.current = { now, rules };
+  }, [now, rules]);
 
   useEffect(() => {
     if (!isTauriRuntime() || inFlightRef.current) {
@@ -36,9 +42,10 @@ export function ReminderRunner({ plans, now, rules }: ReminderRunnerProps) {
     }
 
     inFlightRef.current = true;
-    void sendReminderNotifications(candidates).finally(() => {
-      inFlightRef.current = false;
-    });
+    void sendReminderNotifications(candidates, () => latestContextRef.current)
+      .finally(() => {
+        inFlightRef.current = false;
+      });
   }, [now, plans, rules]);
 
   return null;
@@ -46,6 +53,7 @@ export function ReminderRunner({ plans, now, rules }: ReminderRunnerProps) {
 
 async function sendReminderNotifications(
   candidates: PlanReminderCandidate[],
+  getCurrentContext?: () => { now: Date; rules: PlanReminderRules },
 ): Promise<void> {
   try {
     const {
@@ -64,9 +72,22 @@ async function sendReminderNotifications(
       return;
     }
 
+    const currentContext = getCurrentContext?.();
+    const currentCandidates = currentContext
+      ? filterPlanReminderCandidatesForRules(
+          candidates,
+          currentContext.now,
+          currentContext.rules,
+        )
+      : candidates;
+
+    if (currentCandidates.length === 0) {
+      return;
+    }
+
     const sentKeys: string[] = [];
 
-    for (const candidate of candidates) {
+    for (const candidate of currentCandidates) {
       sendNotification({
         title: getNotificationTitle(candidate),
         body: getNotificationBody(candidate),

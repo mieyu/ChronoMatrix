@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   buildPlanReminderCandidates,
+  filterPlanReminderCandidatesForRules,
   getPlanReminderKey,
 } from "./reminders";
 import type { Plan } from "./plan";
@@ -171,6 +172,36 @@ describe("buildPlanReminderCandidates", () => {
     );
 
     expect(candidates).toEqual([]);
+  });
+
+  test("filters stale due-soon candidates against current reminder rules", () => {
+    const candidates = buildPlanReminderCandidates(
+      [
+        plan({
+          id: "due-soon",
+          endAt: "2026-06-06T10:59:00.000Z",
+        }),
+        plan({
+          id: "expired",
+          endAt: "2026-06-06T10:00:00.000Z",
+        }),
+      ],
+      now,
+      new Set(),
+    );
+
+    expect(
+      filterPlanReminderCandidatesForRules(candidates, now, {
+        enabled: false,
+        dueSoonMinutes: 30,
+      }),
+    ).toEqual([]);
+    expect(
+      filterPlanReminderCandidatesForRules(candidates, now, {
+        enabled: true,
+        dueSoonMinutes: 0,
+      }).map((candidate) => candidate.kind),
+    ).toEqual(["expired"]);
   });
 
   test("changes the reminder key when a plan deadline changes", () => {
