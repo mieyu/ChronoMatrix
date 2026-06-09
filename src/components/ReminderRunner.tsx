@@ -3,6 +3,7 @@ import { markReminderKeysSent, listSentReminderKeys } from "@/data/reminders";
 import {
   buildPlanReminderCandidates,
   type PlanReminderCandidate,
+  type PlanReminderRules,
 } from "@/domain/reminders";
 import type { Plan } from "@/domain/plan";
 import { formatPlanTime } from "@/lib/dates";
@@ -10,11 +11,12 @@ import { formatPlanTime } from "@/lib/dates";
 interface ReminderRunnerProps {
   plans: Plan[];
   now: Date;
+  rules: PlanReminderRules;
 }
 
 const maxNotificationsPerPass = 3;
 
-export function ReminderRunner({ plans, now }: ReminderRunnerProps) {
+export function ReminderRunner({ plans, now, rules }: ReminderRunnerProps) {
   useEffect(() => {
     if (!isTauriRuntime()) {
       return;
@@ -24,6 +26,7 @@ export function ReminderRunner({ plans, now }: ReminderRunnerProps) {
       plans,
       now,
       listSentReminderKeys(),
+      rules,
     ).slice(0, maxNotificationsPerPass);
 
     if (candidates.length === 0) {
@@ -31,7 +34,7 @@ export function ReminderRunner({ plans, now }: ReminderRunnerProps) {
     }
 
     void sendReminderNotifications(candidates);
-  }, [now, plans]);
+  }, [now, plans, rules]);
 
   return null;
 }

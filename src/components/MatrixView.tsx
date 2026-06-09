@@ -41,13 +41,18 @@ import {
   zoomMatrixViewportByWheel,
   type MatrixViewport,
 } from "@/domain/matrixViewport";
-import { getPlanMatrixPlacement, type Plan } from "@/domain/plan";
+import {
+  getPlanMatrixPlacement,
+  type MatrixRules,
+  type Plan,
+} from "@/domain/plan";
 import { formatPlanTime, formatTimePressure } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
 
 interface MatrixViewProps {
   plans: Plan[];
   now: Date;
+  matrixRules: MatrixRules;
 }
 
 // One normalized matrix unit spans 42% of the canvas (see `matrixPosition`).
@@ -57,7 +62,7 @@ const MATRIX_UNIT_FRACTION = 0.42;
 const MATRIX_DOT_FOOTPRINT_WIDTH = 96;
 const MATRIX_DOT_FOOTPRINT_HEIGHT = 30;
 
-export function MatrixView({ plans, now }: MatrixViewProps) {
+export function MatrixView({ plans, now, matrixRules }: MatrixViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -77,7 +82,7 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
 
   const placements = plans.map((plan) => ({
     plan,
-    placement: getPlanMatrixPlacement(plan, now),
+    placement: getPlanMatrixPlacement(plan, now, matrixRules),
   }));
   const matrixPlans = placements.filter(({ placement }) => placement.bucket === "matrix");
   const expiredPlans = placements.filter(({ placement }) => placement.bucket === "expired");
@@ -106,8 +111,8 @@ export function MatrixView({ plans, now }: MatrixViewProps) {
     };
   }, [canvasSize.height, canvasSize.width, viewport.scale]);
   const matrixLayoutItems = useMemo(
-    () => buildMatrixLayoutItems(plans, now, undefined, matrixLayoutRules),
-    [matrixLayoutRules, now, plans],
+    () => buildMatrixLayoutItems(plans, now, matrixRules, matrixLayoutRules),
+    [matrixLayoutRules, matrixRules, now, plans],
   );
   const scaleLabel = `${Math.round(viewport.scale * 100)}%`;
 

@@ -16,13 +16,18 @@ import {
   type ReviewPeriodId,
   type ReviewQuadrantStats,
 } from "@/domain/reviewStats";
-import { deriveEffectiveStatus, type Plan } from "@/domain/plan";
+import {
+  deriveEffectiveStatus,
+  type MatrixRules,
+  type Plan,
+} from "@/domain/plan";
 import { formatPlanTime } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
 
 interface ReviewViewProps {
   plans: Plan[];
   now: Date;
+  matrixRules: MatrixRules;
 }
 
 const periodLabels: Record<ReviewPeriodId, string> = {
@@ -31,12 +36,12 @@ const periodLabels: Record<ReviewPeriodId, string> = {
   last_30_days: "近 30 天",
 };
 
-export function ReviewView({ plans, now }: ReviewViewProps) {
+export function ReviewView({ plans, now, matrixRules }: ReviewViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
   const [period, setPeriod] = useState<ReviewPeriodId>("this_week");
   const stats = useMemo(
-    () => buildReviewStats(plans, now, period),
-    [now, period, plans],
+    () => buildReviewStats(plans, now, period, matrixRules),
+    [matrixRules, now, period, plans],
   );
   const completionRateLabel = `${Math.round(stats.metrics.completionRate * 100)}%`;
 

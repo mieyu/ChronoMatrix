@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCcw,
   Search,
+  Settings as SettingsIcon,
   SunMedium,
   TimerReset,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import { PlanDialog } from "@/components/PlanDialog";
 import { ReminderRunner } from "@/components/ReminderRunner";
 import { ReviewView } from "@/components/ReviewView";
 import { SearchDialog } from "@/components/SearchDialog";
+import { SettingsDialog } from "@/components/SettingsDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TodayView } from "@/components/TodayView";
 import { listPlans } from "@/data/plans";
@@ -31,6 +33,12 @@ import {
   type EffectivePlanStatus,
   type Plan,
 } from "@/domain/plan";
+import {
+  getMatrixRulesFromSettings,
+  getReminderRulesFromSettings,
+  type AppSettings,
+} from "@/domain/settings";
+import { useSettingsStore } from "@/state/settings";
 import { useUiStore, type AppView } from "@/state/ui";
 import { initThemeEffect } from "@/state/theme";
 
@@ -47,8 +55,22 @@ function App() {
   const setView = useUiStore((state) => state.setView);
   const openCreateDialog = useUiStore((state) => state.openCreateDialog);
   const openSearch = useUiStore((state) => state.openSearch);
+  const openSettings = useUiStore((state) => state.openSettings);
   const dialogOpen = useUiStore((state) => state.dialogOpen);
   const editingPlan = useUiStore((state) => state.editingPlan);
+  const defaultView = useSettingsStore((state) => state.defaultView);
+  const importantThreshold = useSettingsStore(
+    (state) => state.importantThreshold,
+  );
+  const urgentWindowHours = useSettingsStore(
+    (state) => state.urgentWindowHours,
+  );
+  const remindersEnabled = useSettingsStore(
+    (state) => state.remindersEnabled,
+  );
+  const reminderLeadMinutes = useSettingsStore(
+    (state) => state.reminderLeadMinutes,
+  );
   const [now, setNow] = useState(() => new Date());
   const plansQuery = useQuery({
     queryKey: ["plans"],
@@ -56,6 +78,19 @@ function App() {
   });
 
   useEffect(() => initThemeEffect(), []);
+
+  useEffect(() => {
+    const applyDefaultView = () => {
+      setView(useSettingsStore.getState().defaultView as AppView);
+    };
+
+    if (useSettingsStore.persist.hasHydrated()) {
+      applyDefaultView();
+      return;
+    }
+
+    return useSettingsStore.persist.onFinishHydration(applyDefaultView);
+  }, [setView]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -80,6 +115,30 @@ function App() {
     };
   }, []);
 
+  const settings = useMemo<AppSettings>(
+    () => ({
+      defaultView,
+      importantThreshold,
+      urgentWindowHours,
+      remindersEnabled,
+      reminderLeadMinutes,
+    }),
+    [
+      defaultView,
+      importantThreshold,
+      reminderLeadMinutes,
+      remindersEnabled,
+      urgentWindowHours,
+    ],
+  );
+  const matrixRules = useMemo(
+    () => getMatrixRulesFromSettings(settings),
+    [settings],
+  );
+  const reminderRules = useMemo(
+    () => getReminderRulesFromSettings(settings),
+    [settings],
+  );
   const plans = plansQuery.data ?? [];
   const stats = useMemo(() => getStats(plans, now), [plans, now]);
 
@@ -142,6 +201,15 @@ function App() {
             刷新
           </Button>
           <ThemeToggle />
+          <Button
+            variant="outline"
+            size="icon"
+            title="设置"
+            aria-label="打开设置"
+            onClick={openSettings}
+          >
+            <SettingsIcon />
+          </Button>
           <Button onClick={openCreateDialog}>
             <Plus />
             新增计划
@@ -168,20 +236,35 @@ function App() {
           </div>
         ) : (
           <>
-            {view === "today" ? <TodayView plans={plans} now={now} /> : null}
-            {view === "matrix" ? <MatrixView plans={plans} now={now} /> : null}
+            {view === "today" ? (
+              <TodayView
+                plans={plans}
+                now={now}
+                importantThreshold={matrixRules.importantThreshold}
+              />
+            ) : null}
+            {view === "matrix" ? (
+              <MatrixView plans={plans} now={now} matrixRules={matrixRules} />
+            ) : null}
             {view === "calendar" ? (
-              <CalendarView plans={plans} now={now} />
+              <CalendarView
+                plans={plans}
+                now={now}
+                matrixRules={matrixRules}
+              />
             ) : null}
             {view === "list" ? <ListView plans={plans} now={now} /> : null}
-            {view === "review" ? <ReviewView plans={plans} now={now} /> : null}
+            {view === "review" ? (
+              <ReviewView plans={plans} now={now} matrixRules={matrixRules} />
+            ) : null}
           </>
         )}
       </section>
 
       <PlanDialog plan={editingPlan} open={dialogOpen} />
       <SearchDialog plans={plans} now={now} />
-      <ReminderRunner plans={plans} now={now} />
+      <SettingsDialog />
+      <ReminderRunner plans={plans} now={now} rules={reminderRules} />
     </main>
   );
 }

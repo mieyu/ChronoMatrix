@@ -26,13 +26,19 @@ import {
   type CalendarMode,
   type CalendarSpan,
 } from "@/domain/calendar";
-import { getPlanQuadrant, type MatrixQuadrant, type Plan } from "@/domain/plan";
+import {
+  getPlanQuadrant,
+  type MatrixQuadrant,
+  type MatrixRules,
+  type Plan,
+} from "@/domain/plan";
 import { formatPlanTime } from "@/lib/dates";
 import { useUiStore } from "@/state/ui";
 
 interface CalendarViewProps {
   plans: Plan[];
   now: Date;
+  matrixRules: MatrixRules;
 }
 
 const markerLabels: Record<CalendarMarkerKind, string> = {
@@ -54,7 +60,7 @@ const quadrantBarClass: Record<MatrixQuadrant, string> = {
 
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export function CalendarView({ plans, now }: CalendarViewProps) {
+export function CalendarView({ plans, now, matrixRules }: CalendarViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
   const [mode, setMode] = useState<CalendarMode>("week");
   const [calendarAnchor, setCalendarAnchor] = useState(now);
@@ -163,6 +169,7 @@ export function CalendarView({ plans, now }: CalendarViewProps) {
                 mode={mode}
                 plans={calendarPlans}
                 now={now}
+                matrixRules={matrixRules}
                 onOpenPlan={openEditDialog}
               />
             ))}
@@ -214,6 +221,7 @@ function CalendarWeekRow({
   mode,
   plans,
   now,
+  matrixRules,
   onOpenPlan,
 }: {
   week: Date[];
@@ -221,6 +229,7 @@ function CalendarWeekRow({
   mode: CalendarMode;
   plans: Plan[];
   now: Date;
+  matrixRules: MatrixRules;
   onOpenPlan: (plan: Plan) => void;
 }) {
   const spans = getCalendarSpansForWeek(plans, week);
@@ -245,6 +254,7 @@ function CalendarWeekRow({
           anchor={anchor}
           mode={mode}
           now={now}
+          matrixRules={matrixRules}
           pointOffset={display.pointOffset}
           entries={getCalendarEntriesForDay(plans, day)}
           onOpenPlan={onOpenPlan}
@@ -258,6 +268,7 @@ function CalendarWeekRow({
           lane={index}
           mode={mode}
           now={now}
+          matrixRules={matrixRules}
           onClick={() => onOpenPlan(span.plan)}
         />
       ))}
@@ -270,6 +281,7 @@ function CalendarDayCell({
   anchor,
   mode,
   now,
+  matrixRules,
   pointOffset,
   entries,
   onOpenPlan,
@@ -278,6 +290,7 @@ function CalendarDayCell({
   anchor: Date;
   mode: CalendarMode;
   now: Date;
+  matrixRules: MatrixRules;
   pointOffset: number;
   entries: CalendarEntry[];
   onOpenPlan: (plan: Plan) => void;
@@ -319,6 +332,7 @@ function CalendarDayCell({
             entry={entry}
             compact={mode === "month"}
             now={now}
+            matrixRules={matrixRules}
             onClick={() => onOpenPlan(entry.plan)}
           />
         ))}
@@ -332,16 +346,19 @@ function CalendarSpanBar({
   lane,
   mode,
   now,
+  matrixRules,
   onClick,
 }: {
   span: CalendarSpan;
   lane: number;
   mode: CalendarMode;
   now: Date;
+  matrixRules: MatrixRules;
   onClick: () => void;
 }) {
   const top = mode === "month" ? 42 + lane * 24 : 46 + lane * 30;
-  const colorClass = quadrantBarClass[getPlanQuadrant(span.plan, now)];
+  const colorClass =
+    quadrantBarClass[getPlanQuadrant(span.plan, now, matrixRules)];
   const style: CSSProperties = {
     left: `calc(${(span.startIndex / 7) * 100}% + 6px)`,
     width: `calc(${((span.endIndex - span.startIndex + 1) / 7) * 100}% - 12px)`,
@@ -372,11 +389,13 @@ function CalendarPointCard({
   entry,
   compact,
   now,
+  matrixRules,
   onClick,
 }: {
   entry: CalendarEntry;
   compact: boolean;
   now: Date;
+  matrixRules: MatrixRules;
   onClick: () => void;
 }) {
   if (compact) {
@@ -384,7 +403,7 @@ function CalendarPointCard({
       <button
         type="button"
         className={`flex w-full items-center gap-1 overflow-hidden rounded-md border px-2 py-1 text-left text-xs shadow-sm transition hover:border-ring ${
-          quadrantBarClass[getPlanQuadrant(entry.plan, now)]
+          quadrantBarClass[getPlanQuadrant(entry.plan, now, matrixRules)]
         }`}
         onClick={onClick}
         title={entry.plan.title}

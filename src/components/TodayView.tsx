@@ -45,6 +45,7 @@ import { useUiStore } from "@/state/ui";
 interface TodayViewProps {
   plans: Plan[];
   now: Date;
+  importantThreshold: number;
 }
 
 type DailyMode = "notebook" | "time_slices";
@@ -56,7 +57,11 @@ const sectionIcons: Record<TodaySectionId, ReactNode> = {
   important_unscheduled: <CalendarClock className="size-4" />,
 };
 
-export function TodayView({ plans, now }: TodayViewProps) {
+export function TodayView({
+  plans,
+  now,
+  importantThreshold,
+}: TodayViewProps) {
   const openEditDialog = useUiStore((state) => state.openEditDialog);
   const queryClient = useQueryClient();
   const todayDate = useMemo(() => getDailyNotebookDateKey(now), [now]);
@@ -87,7 +92,10 @@ export function TodayView({ plans, now }: TodayViewProps) {
       queryClient.invalidateQueries({ queryKey: ["daily-notebooks"] });
     },
   });
-  const sections = useMemo(() => buildTodaySections(plans, now), [plans, now]);
+  const sections = useMemo(
+    () => buildTodaySections(plans, now, { importantThreshold }),
+    [importantThreshold, now, plans],
+  );
   const total = getTodayPlanCount(sections);
   const historyDates = useMemo(
     () =>
