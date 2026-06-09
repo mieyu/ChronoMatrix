@@ -8,6 +8,7 @@ interface UiState {
   editingPlan: Plan | null;
   dialogOpen: boolean;
   searchOpen: boolean;
+  settingsOpen: boolean;
   setView: (view: AppView) => void;
   openCreateDialog: () => void;
   openEditDialog: (plan: Plan) => void;
@@ -15,6 +16,9 @@ interface UiState {
   openSearch: () => void;
   closeSearch: () => void;
   setSearchOpen: (open: boolean) => void;
+  openSettings: () => void;
+  closeSettings: () => void;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -22,6 +26,7 @@ export const useUiStore = create<UiState>((set) => ({
   editingPlan: null,
   dialogOpen: false,
   searchOpen: false,
+  settingsOpen: false,
   setView: (view) => set({ view }),
   openCreateDialog: () => set({ dialogOpen: true, editingPlan: null }),
   openEditDialog: (plan) => set({ dialogOpen: true, editingPlan: plan }),
@@ -29,4 +34,7 @@ export const useUiStore = create<UiState>((set) => ({
   openSearch: () => set({ searchOpen: true }),
   closeSearch: () => set({ searchOpen: false }),
   setSearchOpen: (open) => set({ searchOpen: open }),
+  openSettings: () => set({ settingsOpen: true }),
+  closeSettings: () => set({ settingsOpen: false }),
+  setSettingsOpen: (open) => set({ settingsOpen: open }),
 }));
