@@ -10,7 +10,7 @@ export interface PlanReminderCandidate {
 }
 
 export interface PlanReminderRules {
-  enabled: boolean;
+  enabled?: boolean;
   dueSoonMinutes: number;
 }
 
@@ -25,7 +25,7 @@ export function buildPlanReminderCandidates(
   sentKeys: ReadonlySet<string>,
   rules: PlanReminderRules = defaultRules,
 ): PlanReminderCandidate[] {
-  if (!rules.enabled) {
+  if (rules.enabled === false) {
     return [];
   }
 

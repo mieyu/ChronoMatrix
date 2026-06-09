@@ -222,7 +222,7 @@ describe("buildReviewStats", () => {
         plan({
           id: "below-custom-threshold",
           importanceScore: 7,
-          endAt: "2026-06-06T11:00:00.000Z",
+          endAt: "2026-06-08T10:30:00.000Z",
         }),
         plan({
           id: "unscheduled-below-custom-threshold",
@@ -231,11 +231,12 @@ describe("buildReviewStats", () => {
       ],
       new Date("2026-06-06T10:30:00.000Z"),
       "this_week",
-      { urgentWindowHours: 72, pressureHorizonDays: 14, importantThreshold: 8 },
+      { urgentWindowHours: 24, pressureHorizonDays: 14, importantThreshold: 8 },
     );
 
-    expect(stats.quadrants["not-important-urgent"].total).toBe(1);
-    expect(stats.quadrants["important-urgent"].total).toBe(0);
+    expect(stats.quadrants["not-important-not-urgent"].total).toBe(1);
+    expect(stats.quadrants["not-important-urgent"].total).toBe(0);
+    expect(stats.quadrants["important-not-urgent"].total).toBe(0);
     expect(stats.importantUnscheduledPlans).toEqual([]);
   });
 });

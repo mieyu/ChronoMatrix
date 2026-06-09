@@ -136,6 +136,27 @@ describe("buildPlanReminderCandidates", () => {
     expect(candidates).toEqual([]);
   });
 
+  test("keeps reminders enabled when custom rules omit enabled", () => {
+    const candidates = buildPlanReminderCandidates(
+      [
+        plan({
+          id: "due-soon",
+          endAt: "2026-06-06T10:59:00.000Z",
+        }),
+      ],
+      now,
+      new Set(),
+      { dueSoonMinutes: 30 },
+    );
+
+    expect(candidates).toMatchObject([
+      {
+        kind: "due_soon",
+        key: "due-soon:due_soon:2026-06-06T10:59:00.000Z",
+      },
+    ]);
+  });
+
   test("does not create due-soon reminders when the lead time is zero", () => {
     const candidates = buildPlanReminderCandidates(
       [
