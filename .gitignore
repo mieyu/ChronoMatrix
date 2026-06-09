@@ -16,6 +16,7 @@ lerna-debug.log*
 *.db
 *.sqlite
 *.sqlite3
+.superpowers/
 
 # Generated dependencies and builds
 node_modules
